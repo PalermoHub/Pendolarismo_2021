@@ -720,9 +720,10 @@ function renderScopeFlows(ids, minVal) {
     .map((id) => {
       const pos = point(id);
       const t = flowIndex.totals.get(id) ?? { out: 0, in: 0, self: 0 };
-      return pos ? { position: pos, radius: bubbleRadius(t.out + t.in + t.self) } : null;
+      return pos ? { id, position: pos, radius: bubbleRadius(t.out + t.in + t.self), saldo: t.in - t.out } : null;
     })
     .filter(Boolean);
+  const scopeMaxAbsSaldo = Math.max(1, ...scopeNodes.map((d) => Math.abs(d.saldo)));
   const externalNodes = [...nodes.values()];
 
   const arcColor = (kind) => (kind === "out" ? [255, 68, 0] : kind === "in" ? [251, 235, 124] : [0, 0, 221]);
@@ -751,12 +752,19 @@ function renderScopeFlows(ids, minVal) {
       new deck.ScatterplotLayer({
         id: "nodes-scope",
         data: scopeNodes,
+        pickable: true,
         visible: showNodes,
         getPosition: (d) => d.position,
         getRadius: (d) => d.radius,
-        getFillColor: [61, 127, 255, 180],
+        getFillColor: (d) => saldoColor(d.saldo, scopeMaxAbsSaldo),
         stroked: false,
         radiusUnits: "pixels",
+        onClick: (info) => {
+          if (!info.object) return false;
+          const d = info.object;
+          showPopup(info.coordinate, `<strong>${esc(nomeComune(d.id))}</strong><p>Saldo: ${d.saldo >= 0 ? "+" : ""}${fmt(d.saldo)}</p>`);
+          return true;
+        },
       }),
       new deck.ScatterplotLayer({
         id: "nodes-scope-external",
@@ -811,6 +819,20 @@ function bubbleValue(proComId, kind) {
 
 function bubbleRadius(v) {
   return 1.5 + Math.sqrt(Math.max(v, 1)) / BUBBLE_RADIUS_PX;
+}
+
+// Saldo pendolari del comune: positivo = polo lavoro (entrano più occupati di quanti
+// residenti escono), negativo = dormitorio (escono più residenti di quanti occupati entrano).
+// Stessa logica/palette del bar divergente (blu #3d7fff pos, arancio #ff4400 neg).
+function saldoValue(proComId) {
+  const t = flowIndex.totals.get(proComId) ?? { out: 0, in: 0, self: 0 };
+  return t.in - t.out;
+}
+
+function saldoColor(saldo, maxAbs) {
+  const t = maxAbs > 0 ? Math.min(1, Math.abs(saldo) / maxAbs) : 0;
+  const alpha = Math.round(90 + t * 140);
+  return saldo >= 0 ? [61, 127, 255, alpha] : [255, 68, 0, alpha];
 }
 
 function renderArcs(proCom) {
@@ -920,9 +942,10 @@ function renderAllFlows() {
   const nodeList = [...flowIndex.totals.entries()]
     .map(([id, t]) => {
       const pos = point(id);
-      return pos ? { position: pos, radius: bubbleRadius(t.out + t.in + t.self) } : null;
+      return pos ? { id, position: pos, radius: bubbleRadius(t.out + t.in + t.self), saldo: t.in - t.out } : null;
     })
     .filter(Boolean);
+  const maxAbsSaldo = Math.max(1, ...nodeList.map((d) => Math.abs(d.saldo)));
 
   overlay.setProps({
     layers: [
@@ -948,12 +971,19 @@ function renderAllFlows() {
       new deck.ScatterplotLayer({
         id: "nodes-all",
         data: nodeList,
+        pickable: true,
         visible: showNodes,
         getPosition: (d) => d.position,
         getRadius: (d) => d.radius,
-        getFillColor: [61, 127, 255, 180],
+        getFillColor: (d) => saldoColor(d.saldo, maxAbsSaldo),
         stroked: false,
         radiusUnits: "pixels",
+        onClick: (info) => {
+          if (!info.object) return false;
+          const d = info.object;
+          showPopup(info.coordinate, `<strong>${esc(nomeComune(d.id))}</strong><p>Saldo: ${d.saldo >= 0 ? "+" : ""}${fmt(d.saldo)}</p>`);
+          return true;
+        },
       }),
     ],
   });
