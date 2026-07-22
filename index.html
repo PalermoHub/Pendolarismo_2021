@@ -151,6 +151,156 @@
   <img src="img/opendatasicilia.png" alt="Open Data Sicilia" />
 </a>
 
+<!-- ── Info modal (slide dal basso) ── -->
+<div id="infoOverlay"></div>
+<div id="infoModalWrap">
+  <button id="infoModalTab" aria-label="Apri/chiudi informazioni" title="Informazioni">
+    <svg id="infoTabIcon" viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+    <span id="infoTabLabel">Informazioni</span>
+    <svg id="infoTabArrow" viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M7 10l5 5 5-5z"/></svg>
+  </button>
+  <div id="infoModal" role="dialog" aria-modal="true" aria-labelledby="infoModalTitle">
+    <div class="gfm-header">
+      <h3 id="infoModalTitle">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+        Informazioni
+      </h3>
+      <button id="infoClose" aria-label="Chiudi">&#x2715;</button>
+    </div>
+    <div class="info-tabbar">
+      <button class="info-tab active" data-itab="analisi">Analisi</button>
+      <button class="info-tab" data-itab="guida">Guida</button>
+      <button class="info-tab" data-itab="credits">Credits</button>
+    </div>
+
+    <div class="info-panel active" id="itab-analisi">
+      <div class="info-section">
+        <p class="analisi-title">Come si sposta chi lavora in Italia?</p>
+        <p class="info-text">La mappa mette in scena oltre <strong>523.000 flussi di pendolarismo</strong> tra i 7.896 comuni italiani, ricostruiti dai dati censuari ISTAT 2021 sugli spostamenti casa-lavoro. Ogni arco rappresenta un flusso di lavoratori che ogni giorno si muovono da un comune di residenza verso un comune diverso per raggiungere il posto di lavoro.</p>
+
+        <h3 class="analisi-h3">Come funziona la mappa</h3>
+        <p class="info-text">Ogni comune è rappresentato da un nodo la cui dimensione è proporzionale al numero di lavoratori coinvolti. Gli archi mostrano la direzione del flusso:</p>
+        <ul class="analisi-list">
+          <li><strong>Arancione</strong> — pendolarismo in uscita: residenti che lavorano altrove</li>
+          <li><strong>Giallo</strong> — pendolarismo in entrata: lavoratori attratti da fuori comune</li>
+        </ul>
+        <p class="info-text">Il saldo tra entrate e uscite distingue i comuni <strong>poli di lavoro</strong> (attraggono più di quanto cedono) dai comuni <strong>dormitorio</strong> (cedono più di quanto attraggono).</p>
+
+        <hr class="analisi-sep">
+
+        <h3 class="analisi-h3">Cosa racconta il pendolarismo</h3>
+        <p class="info-text">I flussi di pendolarismo disegnano la vera geografia funzionale del territorio, spesso diversa da quella amministrativa: aree metropolitane che superano i confini regionali, comuni satellite gravitanti attorno a poli occupazionali, corridoi di mobilità lungo le principali infrastrutture di trasporto.</p>
+        <p class="info-text">Guardare dove le persone si spostano per lavorare, più che dove risiedono, aiuta a capire come sono organizzati davvero il lavoro e i servizi in Italia.</p>
+
+        <hr class="analisi-sep">
+
+        <h3 class="analisi-h3">Dati per regione</h3>
+        <p class="info-text">Residenti occupati e flussi <strong>interregionali</strong> (verso/da regioni diverse) aggregati per regione di residenza/lavoro.</p>
+        <div class="analisi-table-wrap" id="analisiRegioniTable"><p class="info-text">Caricamento dati…</p></div>
+
+        <h3 class="analisi-h3">Saldo pendolari per regione (entrata − uscita)</h3>
+        <p class="info-text">Positivo (blu) = regione attrattiva, più occupati in entrata da altre regioni; negativo (arancio) = regione che esporta forza lavoro verso altre regioni.</p>
+        <div id="analisiRegioniChart"></div>
+
+        <p class="analisi-footer">Dati: ISTAT, Censimento permanente della popolazione 2021 — matrice pendolarismo per lavoro.</p>
+      </div>
+    </div>
+
+    <div class="info-panel" id="itab-guida">
+      <div class="info-section">
+        <p class="analisi-title">Guida alla mappa "Pendolarismo lavoro 2021"</p>
+        <p class="info-text">Questa mappa mostra <strong>dove vanno a lavorare le persone</strong>, comune per comune, in tutta Italia. I dati vengono dal Censimento permanente ISTAT 2021 e riguardano chi, almeno tre giorni a settimana, si sposta dalla propria casa al posto di lavoro in un altro comune (o resta a lavorare nello stesso comune di residenza).</p>
+        <p class="info-text">Visivamente la mappa è ispirata al lavoro di Günter Richter: ogni collegamento tra due comuni è disegnato come un <strong>arco curvo</strong>, non una linea dritta. Più persone si spostano tra due comuni, più l'arco sarà marcato (spesso e/o luminoso).</p>
+
+        <h3 class="analisi-h3">Come leggere la mappa a colpo d'occhio</h3>
+        <p class="info-text">Ogni comune è un punto sulla mappa. Gli archi che partono e arrivano dai punti rappresentano i flussi di pendolari. Il colore dell'arco ti dice il tipo di flusso:</p>
+        <ul class="analisi-list">
+          <li><i class="swatch line" style="background:#ff4400"></i> <strong>Uscita</strong> — residenti che vanno a lavorare in un altro comune (persone che "escono")</li>
+          <li><i class="swatch line" style="background:#fbeb7c"></i> <strong>Entrata</strong> — lavoratori che arrivano da un altro comune per lavorare lì (persone che "entrano")</li>
+          <li><i class="swatch dot" style="background:#0000dd"></i> <strong>Flusso interno / nodo misto</strong> — chi lavora nello stesso comune in cui abita, oppure un nodo che ha sia entrate che uscite</li>
+          <li><i class="swatch dot" style="background:#b4b4b4"></i> <strong>Comune collegato (fuori area)</strong> — un comune esterno alla tua area di interesse ma comunque collegato ad essa</li>
+          <li><i class="swatch dot" style="background:#3d7fff"></i> <strong>Comune selezionato</strong> — il comune che hai scelto cliccandoci sopra, evidenziato rispetto agli altri</li>
+        </ul>
+
+        <hr class="analisi-sep">
+
+        <h3 class="analisi-h3">Le due barre (i due pannelli)</h3>
+        <p class="info-text">Sulla mappa trovi due pannelli mobili/apribili, ognuno con una sua funzione precisa.</p>
+
+        <p class="info-text"><strong>1. Pannello "Legenda"</strong><br>Serve a due cose insieme: <strong>spiegarti i colori</strong> e <strong>filtrare cosa vedere</strong>. Ogni voce della legenda (Uscita, Entrata, Flusso interno, ecc.) è <strong>cliccabile</strong>: se clicchi su una voce, puoi accendere o spegnere quella categoria sulla mappa. Ha una freccetta <strong>◀</strong> per comprimere/nascondere il pannello quando non ti serve, e una <strong>✕</strong> per chiuderlo del tutto.</p>
+
+        <p class="info-text"><strong>2. Pannello "Filtri geografici"</strong><br>Questo è il pannello di <strong>ricerca e selezione territoriale</strong>, cioè lo strumento con cui scegli su quale zona d'Italia vuoi concentrarti. Nella barra in alto trovi:</p>
+        <ul class="analisi-list">
+          <li><span class="guida-icon"><svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg></span> la <strong>barra di ricerca</strong>, dove digitare regione, provincia o comune</li>
+          <li><span class="guida-icon"><svg viewBox="0 0 24 24"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg></span> il pulsante <strong>Filtri</strong>, che apre il pannello con tendine a cascata in ordine: <strong>Regione</strong> (default "Tutte le regioni") → <strong>Provincia</strong> (si restringe in base alla regione) → <strong>Comune</strong> ("Seleziona comune")</li>
+        </ul>
+        <p class="info-text">Dopo aver impostato i filtri hai due pulsanti: <strong>Applica</strong> conferma la selezione e aggiorna la mappa, <strong>Ripristina</strong> azzera tutti i filtri e torna alla vista completa. Anche questo pannello si può chiudere con la <strong>✕</strong>.</p>
+
+        <hr class="analisi-sep">
+
+        <h3 class="analisi-h3">Gli strumenti (toolbar mappa)</h3>
+        <p class="info-text">Sul lato sinistro della mappa trovi alcune opzioni che cambiano <em>come</em> vengono disegnati i flussi:</p>
+        <ul class="analisi-list guida-list">
+          <li><span class="guida-icon"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span> <strong>Home</strong> — torna alla vista iniziale dell'Italia</li>
+          <li><span class="guida-icon"><svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg></span> <strong>Schermo intero</strong> — attiva/disattiva la modalità a tutto schermo</li>
+          <li><span class="guida-icon"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="12" r="2.5"/><path d="M7.5 12h9" stroke="currentColor" stroke-width="2"/></svg></span> <strong>Mostra tutti i collegamenti</strong> — visualizza tutti gli archi disponibili per l'area selezionata, non solo quelli principali</li>
+          <li><span class="guida-icon"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/><circle cx="12" cy="12" r="2"/></svg></span> <strong>Mostra punti sui comuni</strong> — aggiunge un pallino su ogni comune coinvolto, utile per vedere anche i comuni con pochi collegamenti</li>
+          <li><span class="guida-icon"><svg viewBox="0 0 24 24"><path d="M9 5v2h6.59L4 18.59 5.41 20 17 8.41V15h2V5H9z"/></svg></span> <strong>Uscita</strong> — mostra solo chi esce dal comune</li>
+          <li><span class="guida-icon"><svg viewBox="0 0 24 24"><path d="M20 5.41L18.59 4 7 15.59V9H5v10h10v-2H8.41z"/></svg></span> <strong>Entrata</strong> — mostra solo chi entra nel comune</li>
+          <li><span class="guida-icon"><svg viewBox="0 0 24 24"><path d="M9.01 14H2v2h7.01v3L13 15l-3.99-4v3zm5.98-1v-3H22V8h-7.01V5L11 9l3.99 4z"/></svg></span> <strong>Entrambi</strong> — mostra insieme i flussi in entrata e in uscita</li>
+          <li><span class="guida-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="6" r="2"/><circle cx="4" cy="18" r="2"/><circle cx="20" cy="18" r="2"/><path d="M12 12L4 6M12 12L20 6M12 12L4 18M12 12L20 18" stroke="currentColor" stroke-width="1.3" fill="none"/></svg></span> <strong>Mostra tutti i collegamenti del comune</strong> — attivo quando selezioni un comune specifico: mostra <em>tutti</em> i suoi collegamenti, anche verso comuni fuori dalla regione/provincia scelta</li>
+        </ul>
+
+        <h3 class="analisi-h3">Come si usa in pratica</h3>
+        <p class="info-text">Oltre ai pannelli, la mappa è pensata per essere esplorata <strong>cliccando direttamente sopra</strong>:</p>
+        <ol class="analisi-list">
+          <li>Clicca su un punto/comune sulla mappa (il sito stesso te lo suggerisce con la scritta "Clicca un comune sulla mappa")</li>
+          <li>Il comune diventa "selezionato" (colore dedicato in legenda) e la mappa mostra solo i suoi collegamenti in entrata/uscita</li>
+          <li>Da lì puoi affinare ulteriormente con le opzioni Entrata/Uscita/Entrambi, o allargare la vista con "Mostra tutti i collegamenti del comune"</li>
+        </ol>
+
+        <hr class="analisi-sep">
+
+        <h3 class="analisi-h3">Un esempio pratico</h3>
+        <p class="info-text">Se vuoi vedere quanti palermitani vanno a lavorare fuori città e da dove arrivano invece i lavoratori pendolari verso Palermo:</p>
+        <ol class="analisi-list">
+          <li>Apri i <strong>Filtri geografici</strong>, imposta Regione = Sicilia, poi cerca "Palermo" nel campo Comune, clicca <strong>Applica</strong></li>
+          <li>Sulla mappa clicca sul punto di Palermo per selezionarlo</li>
+          <li>Usa il selettore <strong>Entrambi</strong> per vedere sia chi esce che chi entra, oppure isola solo <strong>Entrata</strong> per vedere da dove arrivano i lavoratori</li>
+          <li>Se vuoi vedere anche i collegamenti con comuni fuori dalla Sicilia, attiva <strong>Mostra tutti i collegamenti del comune</strong></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="info-panel" id="itab-credits">
+      <div class="info-section">
+        <div class="info-row">
+          <strong>Fonte dati</strong><br><br>
+          <strong>Matrice del pendolarismo per motivi di lavoro 2021</strong>: ISTAT, Censimento permanente della popolazione e delle abitazioni<br>
+          <a href="https://www.istat.it/notizia/matrice-di-pendolarismo-per-lavoro/" title="ISTAT" target="_blank" rel="noopener">Matrice di pendolarismo per lavoro - istat.it</a>
+        </div>
+        <div class="info-row">
+          <strong>Nota</strong><br>
+          I dati si riferiscono al 31 dicembre 2021, durante il periodo pandemico, e potrebbero riflettere i cambiamenti nelle modalità di lavoro (smart working) emersi con la pandemia COVID-19.
+        </div>
+        <div class="info-row">
+          <strong>Ispirazione</strong><br>
+          Vista globale ispirata dalla mappa di <a href="https://gjrichter.github.io/pages/DataVizi/FUA/index_pendolari_2021_arcs_saldo_sum_FUA_dark.html" target="_blank" rel="noopener">Gueter Richter</a>.
+        </div>
+        <hr class="analisi-sep">
+        <p class="info-text">Web app progettata e sviluppata da <a href="https://www.linkedin.com/in/gbvitrano/" target="_blank" rel="noopener" class="mi-link">@gbvitrano</a> per <a href="https://opendatasicilia.it/" target="_blank" rel="noopener" class="mi-link">OpenDataSicilia.it</a>, in collaborazione con <a href="https://claude.ai" target="_blank" rel="noopener" class="mi-link">Claude AI (Anthropic)</a>.</p>
+        <p class="info-text">La mappa usa <b>MapLibre GL JS</b> e <b>PMTiles</b>, formato vettoriale che permette di caricare solo i tile visibili senza server backend: veloce, leggera e ospitabile su hosting statico.</p>
+        <hr class="analisi-sep">
+        <p class="info-text">I contenuti sono rilasciati sotto licenza <a href="https://creativecommons.org/licenses/by/4.0/deed.it" target="_blank" rel="noopener"><strong>CC BY 4.0 – Attribuzione 4.0 Internazionale</strong></a>. Sei libero di condividere e adattare il materiale per qualsiasi scopo, anche commerciale, citando adeguatamente la fonte.</p>
+      </div>
+    </div>
+
+  </div><!-- /infoModal -->
+  <button id="infoTotop" aria-label="Torna in cima">
+    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M7 14l5-5 5 5z"/></svg>
+  </button>
+</div><!-- /infoModalWrap -->
+
 <script type="module" src="js/app.js"></script>
 
 </body>

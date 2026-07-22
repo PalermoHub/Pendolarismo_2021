@@ -28,6 +28,7 @@ async function loadData() {
   initGeoFilters();
   buildGeoSuggestions();
   tryInitialRender();
+  renderAnalisiRegioni();
 }
 
 loadData().catch((err) => {
@@ -500,14 +501,16 @@ function updateFlowView() {
   }
   // nessun filtro geografico: torna alla vista globale/toggle
   map.setFilter("comuni-selected", ["==", ["get", "pro_com"], -1]);
-  const hint = showAllFlows ? "Clicca un comune per i dettagli." : "Clicca un comune sulla mappa.";
+  const hint = showAllFlows
+    ? `<h2 id="panelTitle">Pendolarismo 2021</h2><p id="panelSubtitle">Matrice di pendolarismo per lavoro - istat.it</p>`
+    : `<p id="panelEmpty">Clicca un comune sulla mappa.</p>`;
   if (showAllFlows) {
     renderAllFlows();
   } else {
     overlay.setProps({ layers: [] });
   }
   document.getElementById("panelBody").innerHTML = `
-    <p id="panelEmpty">${hint}</p>
+    ${hint}
     <h3>Saldo pendolari per regione (entrata − uscita)</h3>
     <p class="hint">Positivo = regione attrattiva (più occupati in entrata); negativo = regione che esporta forza lavoro.</p>
     ${divergingHtml(saldoPerRegione(), nomeRegione)}
@@ -554,6 +557,69 @@ function saldoPerRegione() {
   return [...acc.entries()]
     .map(([id, v]) => ({ id, saldo: v.in - v.out }))
     .sort((a, b) => b.saldo - a.saldo);
+}
+
+// Residenti occupati + flussi interregionali (in/out/saldo) per regione, per la tab Analisi.
+function analisiPerRegione() {
+  const acc = new Map();
+  const ensure = (id) => {
+    if (!acc.has(id)) acc.set(id, { residenti: 0, out: 0, in: 0 });
+    return acc.get(id);
+  };
+  for (const [idStr, reg] of Object.entries(geo.comuni)) {
+    const t = flowIndex.totals.get(Number(idStr));
+    if (t) ensure(reg[0]).residenti += t.self + t.out;
+  }
+  for (const [res, edges] of flowIndex.byOrigin) {
+    const rReg = geo.comuni[res]?.[0];
+    if (rReg == null) continue;
+    for (const { other, val } of edges) {
+      const oReg = geo.comuni[other]?.[0];
+      if (oReg == null || oReg === rReg) continue;
+      ensure(rReg).out += val;
+      ensure(oReg).in += val;
+    }
+  }
+  return [...acc.entries()].map(([id, v]) => ({
+    id,
+    residenti: v.residenti,
+    in: v.in,
+    out: v.out,
+    saldo: v.in - v.out,
+  }));
+}
+
+function renderAnalisiRegioni() {
+  const tableEl = document.getElementById("analisiRegioniTable");
+  const chartEl = document.getElementById("analisiRegioniChart");
+  if (!tableEl && !chartEl) return;
+
+  const rows = analisiPerRegione();
+
+  if (tableEl) {
+    const body = [...rows]
+      .sort((a, b) => b.residenti - a.residenti)
+      .map((r) => {
+        const cls = r.saldo >= 0 ? "pos" : "neg";
+        return `<tr>
+          <td>${esc(nomeRegione(r.id))}</td>
+          <td>${fmt(r.residenti)}</td>
+          <td>${fmt(r.in)}</td>
+          <td>${fmt(r.out)}</td>
+          <td class="${cls}">${r.saldo >= 0 ? "+" : ""}${fmt(r.saldo)}</td>
+        </tr>`;
+      })
+      .join("");
+    tableEl.innerHTML = `<table class="analisi-table">
+      <thead><tr><th>Regione</th><th>Residenti occupati</th><th>Entrata</th><th>Uscita</th><th>Saldo</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>`;
+  }
+
+  if (chartEl) {
+    const chartRows = [...rows].sort((a, b) => b.saldo - a.saldo);
+    chartEl.innerHTML = divergingHtml(chartRows, nomeRegione);
+  }
 }
 
 function renderScopePanel(ids, title, scopeType) {
@@ -988,3 +1054,44 @@ map.on("load", () => {
   mapLoaded = true;
   tryInitialRender();
 });
+
+// ── Info modal (slide dal basso) ───────────────────────────────────────
+(function initInfoModal() {
+  const overlay = document.getElementById("infoOverlay");
+  const wrap = document.getElementById("infoModalWrap");
+  const modal = document.getElementById("infoModal");
+  const tabBtn = document.getElementById("infoModalTab");
+
+  function open() { overlay.classList.add("open"); wrap.classList.add("open"); }
+  function close() { overlay.classList.remove("open"); wrap.classList.remove("open"); }
+  function toggle() { wrap.classList.contains("open") ? close() : open(); }
+
+  tabBtn.addEventListener("click", toggle);
+  overlay.addEventListener("click", close);
+  document.getElementById("infoClose").addEventListener("click", close);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+
+  const totop = document.getElementById("infoTotop");
+  function activePanel() { return modal.querySelector(".info-panel.active"); }
+  function updateTotop() {
+    const p = activePanel();
+    totop.classList.toggle("visible", !!p && p.scrollTop > 120);
+  }
+  modal.querySelectorAll(".info-panel").forEach((p) => {
+    p.addEventListener("scroll", updateTotop, { passive: true });
+  });
+  totop.addEventListener("click", () => {
+    const p = activePanel();
+    if (p) p.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  modal.querySelectorAll(".info-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      modal.querySelectorAll(".info-tab").forEach((t) => t.classList.remove("active"));
+      modal.querySelectorAll(".info-panel").forEach((p) => p.classList.remove("active"));
+      tab.classList.add("active");
+      document.getElementById("itab-" + tab.dataset.itab).classList.add("active");
+      updateTotop();
+    });
+  });
+})();
