@@ -80,8 +80,18 @@ const map = new maplibregl.Map({
       },
     ],
   },
-  center: [12.5, 42.5],
-  zoom: 5,
+  bounds: [
+    [6.6, 35.2],
+    [18.6, 47.2],
+  ],
+  fitBoundsOptions: { padding: 20 },
+  minZoom: 5,
+  maxZoom: 12,
+  hash: true,
+  maxBounds: [
+    [4.5, 33.5],
+    [20.5, 48.5],
+  ],
 });
 
 const overlay = new deck.MapboxOverlay({ layers: [] });
