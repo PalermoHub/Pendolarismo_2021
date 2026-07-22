@@ -1676,6 +1676,7 @@ function bivariateCornerRowsHtml(list, def) {
           <span>${esc(def.labelX)}: ${def.formatX(d.x)}</span>
           <span>${esc(def.labelY)}: ${def.formatY(d.y)}</span>
         </div>
+        <div class="bar"><i style="width:${((d.score / 2) * 100).toFixed(1)}%"></i></div>
       </div>`)
     .join("");
 }
