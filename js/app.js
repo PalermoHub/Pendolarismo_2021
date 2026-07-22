@@ -141,6 +141,50 @@ map.addControl(new maplibregl.AttributionControl({ compact: true }));
 const overlay = new deck.MapboxOverlay({ layers: [] });
 map.addControl(overlay);
 
+// Layer di base (archi/nodi della vista corrente) + layer hover, composti insieme:
+// l'hover mostra sempre gli archi del comune sotto il mouse, anche a "flussi" spenti.
+let currentBaseLayers = [];
+let hoveredProCom = null;
+
+function hoverArcsAllowed() {
+  return selectedProCom === null && !showAllFlows && showNodes;
+}
+
+function applyLayers() {
+  const hoverLayer = hoveredProCom !== null && hoverArcsAllowed() ? buildHoverArcLayer(hoveredProCom) : null;
+  overlay.setProps({ layers: hoverLayer ? [...currentBaseLayers, hoverLayer] : currentBaseLayers });
+}
+
+function setBaseLayers(layers) {
+  currentBaseLayers = layers;
+  applyLayers();
+}
+
+function buildHoverArcLayer(proCom) {
+  const origin = point(proCom);
+  if (!origin) return null;
+  const arcs = [];
+  for (const { other, val } of flowIndex.byOrigin.get(proCom) ?? []) {
+    const dest = point(other);
+    if (dest) arcs.push({ from: origin, to: dest, val, fromId: proCom, toId: other, kind: "out" });
+  }
+  for (const { other, val } of flowIndex.byDest.get(proCom) ?? []) {
+    const src = point(other);
+    if (src) arcs.push({ from: src, to: origin, val, fromId: other, toId: proCom, kind: "in" });
+  }
+  const maxArcVal = Math.max(1, ...arcs.map((d) => d.val));
+  return new deck.ArcLayer({
+    id: "hover-arcs",
+    data: arcs,
+    pickable: false,
+    getSourcePosition: (d) => d.from,
+    getTargetPosition: (d) => d.to,
+    getSourceColor: (d) => (d.kind === "out" ? [255, 68, 0, 220] : [251, 235, 124, 220]),
+    getTargetColor: (d) => (d.kind === "out" ? [255, 68, 0, 220] : [251, 235, 124, 220]),
+    getWidth: (d) => 1 + 2.5 * Math.sqrt(d.val / maxArcVal),
+  });
+}
+
 setupPanelToggle();
 
 let selectedProCom = null;
@@ -181,6 +225,7 @@ document.addEventListener("fullscreenchange", () => {
 document.getElementById("btnShowNodes").addEventListener("click", (e) => {
   showNodes = !showNodes;
   e.currentTarget.classList.toggle("active", showNodes);
+  if (!showNodes && hoveredProCom !== null) hoveredProCom = null;
   updateFlowView();
 });
 
@@ -209,8 +254,7 @@ document.querySelectorAll(".dirBtn").forEach((btn) => {
 document.getElementById("btnShowAllFlows").addEventListener("click", (e) => {
   showAllFlows = !showAllFlows;
   e.currentTarget.classList.toggle("active", showAllFlows);
-  resetGeoFilters();
-  selectedProCom = null;
+  if (showAllFlows && hoveredProCom !== null) hoveredProCom = null;
   updateFlowView();
 });
 
@@ -501,14 +545,8 @@ function updateFlowView() {
   }
   // nessun filtro geografico: torna alla vista globale/toggle
   map.setFilter("comuni-selected", ["==", ["get", "pro_com"], -1]);
-  const hint = showAllFlows
-    ? `<h2 id="panelTitle">Pendolarismo 2021</h2><p id="panelSubtitle">Matrice di pendolarismo per lavoro - istat.it</p>`
-    : `<p id="panelEmpty">Clicca un comune sulla mappa.</p>`;
-  if (showAllFlows) {
-    renderAllFlows();
-  } else {
-    overlay.setProps({ layers: [] });
-  }
+  const hint = `<h2 id="panelTitle">Pendolarismo 2021</h2><p id="panelSubtitle">Matrice di pendolarismo per lavoro - istat.it</p>`;
+  renderAllFlows();
   document.getElementById("panelBody").innerHTML = `
     ${hint}
     <h3>Saldo pendolari per regione (entrata − uscita)</h3>
@@ -728,12 +766,12 @@ function renderScopeFlows(ids, minVal) {
 
   const arcColor = (kind) => (kind === "out" ? [255, 68, 0] : kind === "in" ? [251, 235, 124] : [0, 0, 221]);
 
-  overlay.setProps({
-    layers: [
+  setBaseLayers([
       new deck.ArcLayer({
         id: "flows-scope",
         data: arcs,
         pickable: true,
+        visible: showAllFlows,
         getSourcePosition: (d) => d.from,
         getTargetPosition: (d) => d.to,
         getSourceColor: (d) => arcColor(d.kind),
@@ -776,8 +814,7 @@ function renderScopeFlows(ids, minVal) {
         stroked: false,
         radiusUnits: "pixels",
       }),
-    ],
-  });
+  ]);
 }
 
 function syncFiltersToComune(proCom) {
@@ -875,12 +912,12 @@ function renderArcs(proCom) {
       radius: bubbleRadius(bubbleValue(proComOther, d.kind === "both" ? "out" : d.kind)),
     }));
 
-  overlay.setProps({
-    layers: [
+  setBaseLayers([
       new deck.ArcLayer({
         id: "flows",
         data: visibleArcs,
         pickable: true,
+        visible: showAllFlows,
         getSourcePosition: (d) => d.from,
         getTargetPosition: (d) => d.to,
         getSourceColor: (d) => (d.kind === "out" ? [255, 68, 0] : [251, 235, 124]),
@@ -917,8 +954,7 @@ function renderArcs(proCom) {
         stroked: false,
         radiusUnits: "pixels",
       }),
-    ],
-  });
+  ]);
 }
 
 // Con ~524k coppie comune-comune, mostrare tutti i collegamenti richiede una
@@ -947,12 +983,12 @@ function renderAllFlows() {
     .filter(Boolean);
   const maxAbsSaldo = Math.max(1, ...nodeList.map((d) => Math.abs(d.saldo)));
 
-  overlay.setProps({
-    layers: [
+  setBaseLayers([
       new deck.ArcLayer({
         id: "flows-all",
         data: arcs,
         pickable: true,
+        visible: showAllFlows,
         getSourcePosition: (d) => d.from,
         getTargetPosition: (d) => d.to,
         getSourceColor: [255, 68, 0, 110],
@@ -985,8 +1021,7 @@ function renderAllFlows() {
           return true;
         },
       }),
-    ],
-  });
+  ]);
 }
 
 function esc(s) {
@@ -1076,10 +1111,21 @@ map.on("load", () => {
     hoverTooltip.style.left = `${e.point.x}px`;
     hoverTooltip.style.top = `${e.point.y}px`;
     hoverTooltip.style.display = "block";
+    const proCom = f.properties.pro_com;
+    const hoverArcsEnabled = selectedProCom === null && !showAllFlows && showNodes;
+    const nextHovered = hoverArcsEnabled ? proCom : null;
+    if (nextHovered !== hoveredProCom) {
+      hoveredProCom = nextHovered;
+      applyLayers();
+    }
   });
   map.on("mouseleave", "comuni-fill", () => {
     map.getCanvas().style.cursor = "";
     hoverTooltip.style.display = "none";
+    if (hoveredProCom !== null) {
+      hoveredProCom = null;
+      applyLayers();
+    }
   });
   map.on("click", "comuni-fill", (e) => {
     const f = e.features[0];
