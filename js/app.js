@@ -1,4 +1,5 @@
 import { buildIndex, topFlows } from "./flow-index.js";
+import { computeMetrics, quantileBreaks, classify, classCounts, topBottom, donutSegments } from "./coro-index.js";
 
 let flowIndex = null;
 let centroidi = null;
@@ -6,8 +7,11 @@ let geo = null;
 let dataLoaded = false;
 let mapLoaded = false;
 
+let popRes = null;
+let coroData = null; // { metrics: Map<id,{autocontenimento,saldo,intensita}>, autocontBreaks, saldoBreaks, intensitaBreaks }
+
 async function loadData() {
-  const [flows, centroidiData, geoData] = await Promise.all([
+  const [flows, centroidiData, geoData, popResData] = await Promise.all([
     fetch("data/flows.json").then((r) => {
       if (!r.ok) throw new Error(`flows.json: HTTP ${r.status}`);
       return r.json();
@@ -20,15 +24,33 @@ async function loadData() {
       if (!r.ok) throw new Error(`geo.json: HTTP ${r.status}`);
       return r.json();
     }),
+    fetch("data/pop_res_2021.json").then((r) => {
+      if (!r.ok) throw new Error(`pop_res_2021.json: HTTP ${r.status}`);
+      return r.json();
+    }),
   ]);
   flowIndex = buildIndex(flows);
   centroidi = centroidiData;
   geo = geoData;
+  popRes = popResData;
+  coroData = buildCoroData(flowIndex.totals, popRes);
   dataLoaded = true;
   initGeoFilters();
   buildGeoSuggestions();
   tryInitialRender();
   renderAnalisiRegioni();
+  applyCoroFeatureState();
+}
+
+function buildCoroData(totals, pop) {
+  const metrics = computeMetrics(totals, pop);
+  const finite = (key) => [...metrics.values()].map((m) => m[key]).filter((v) => v !== null);
+  return {
+    metrics,
+    autocontBreaks: quantileBreaks(finite("autocontenimento")),
+    saldoBreaks: quantileBreaks(finite("saldo")),
+    intensitaBreaks: quantileBreaks(finite("intensita")),
+  };
 }
 
 loadData().catch((err) => {
@@ -99,6 +121,7 @@ const map = new maplibregl.Map({
       comuni: {
         type: "vector",
         url: `pmtiles://${PMTILES_URL}`,
+        promoteId: { comuni: "pro_com" },
       },
     },
     layers: [
@@ -147,7 +170,7 @@ let currentBaseLayers = [];
 let hoveredProCom = null;
 
 function hoverArcsAllowed() {
-  return selectedProCom === null && !showAllFlows && showNodes;
+  return activePanelTab === "flussi" && selectedProCom === null && !showAllFlows && showNodes;
 }
 
 function applyLayers() {
@@ -1168,34 +1191,39 @@ map.on("load", () => {
   map.on("mousemove", "comuni-fill", (e) => {
     map.getCanvas().style.cursor = "pointer";
     const f = e.features[0];
-    hoverTooltip.textContent = f.properties.comune;
-    hoverTooltip.style.left = `${e.point.x}px`;
-    hoverTooltip.style.top = `${e.point.y}px`;
-    hoverTooltip.style.display = "block";
     const proCom = f.properties.pro_com;
+    updateHoverTooltip(e.point, proCom, f.properties.comune);
     const nextHovered = hoverArcsAllowed() ? proCom : null;
     if (nextHovered !== hoveredProCom) {
       hoveredProCom = nextHovered;
       applyLayers();
-      if (hoveredProCom !== null) renderPanel(hoveredProCom, f.properties.comune);
-      else updateFlowView();
+      if (activePanelTab === "flussi") {
+        if (hoveredProCom !== null) renderPanel(hoveredProCom, f.properties.comune);
+        else updateFlowView();
+      }
     }
   });
   map.on("mouseleave", "comuni-fill", () => {
     map.getCanvas().style.cursor = "";
     hoverTooltip.style.display = "none";
+    hoverTooltip.classList.remove("coro");
     if (hoveredProCom !== null) {
       hoveredProCom = null;
       applyLayers();
-      updateFlowView();
+      if (activePanelTab === "flussi") updateFlowView();
     }
   });
   map.on("click", "comuni-fill", (e) => {
     const f = e.features[0];
-    onComuneClick(f.properties.pro_com, f.properties.comune, e.lngLat);
+    if (activePanelTab === "coro") {
+      showCoroPopup(f.properties.pro_com, f.properties.comune, e.lngLat);
+    } else {
+      onComuneClick(f.properties.pro_com, f.properties.comune, e.lngLat);
+    }
   });
   mapLoaded = true;
   tryInitialRender();
+  applyCoroFeatureState();
 });
 
 // ── Info modal (slide dal basso) ───────────────────────────────────────
@@ -1238,3 +1266,282 @@ map.on("load", () => {
     });
   });
 })();
+
+// ── Tab Coroplettiche ────────────────────────────────────────────────────
+let activePanelTab = "flussi";
+let activeMetric = "autocontenimento";
+let coroFeatureStateApplied = false;
+
+const AUTOCONT_COLORS = ["#fef0d9", "#fdcc8a", "#fc8d59", "#e34a33", "#b30000"];
+const INTENSITA_COLORS = ["#ffffcc", "#c2e699", "#78c679", "#31a354", "#006837"];
+const SALDO_COLORS = ["#ff4400", "#ff9d70", "#8a8a94", "#7aa8ff", "#3d7fff"];
+const NODATA_COLOR = "#3a3a42";
+
+const METRIC_DEFS = {
+  autocontenimento: {
+    label: "Autocontenimento lavorativo",
+    unit: "% occupati residenti che lavorano nello stesso comune",
+    colors: AUTOCONT_COLORS,
+    breaksKey: "autocontBreaks",
+    featureStateKey: "acCls",
+    format: (v) => `${v.toFixed(1)}%`,
+  },
+  saldo: {
+    label: "Saldo pendolarismo",
+    unit: "Entrate − uscite (pendolari)",
+    colors: SALDO_COLORS,
+    breaksKey: "saldoBreaks",
+    featureStateKey: "saldoCls",
+    format: (v) => `${v >= 0 ? "+" : ""}${fmt(v)}`,
+  },
+  intensita: {
+    label: "Intensità pendolarismo",
+    unit: "% pop. residente che esce per lavoro (Sardegna: nessun dato)",
+    colors: INTENSITA_COLORS,
+    breaksKey: "intensitaBreaks",
+    featureStateKey: "intCls",
+    format: (v) => `${v.toFixed(1)}%`,
+  },
+};
+
+// Assegna a ogni comune la classe (0..4) o -1 (nessun dato) per ciascuna delle
+// 3 metriche, come proprietà di MapLibre feature-state sul layer comuni-fill.
+// Va rifatto solo una volta: cambiare metrica attiva aggiorna solo il paint.
+function applyCoroFeatureState() {
+  if (coroFeatureStateApplied || !mapLoaded || !coroData) return;
+  for (const [id, m] of coroData.metrics) {
+    const state = {
+      acCls: m.autocontenimento === null ? -1 : classify(m.autocontenimento, coroData.autocontBreaks),
+      saldoCls: classify(m.saldo, coroData.saldoBreaks),
+      intCls: m.intensita === null ? -1 : classify(m.intensita, coroData.intensitaBreaks),
+    };
+    map.setFeatureState({ source: "comuni", sourceLayer: "comuni", id }, state);
+  }
+  coroFeatureStateApplied = true;
+}
+
+function coroPaintExpression(metric) {
+  const def = METRIC_DEFS[metric];
+  const expr = ["match", ["feature-state", def.featureStateKey]];
+  def.colors.forEach((color, i) => expr.push(i, color));
+  expr.push(NODATA_COLOR);
+  return expr;
+}
+
+function applyCoroLayer(metric) {
+  map.setPaintProperty("comuni-fill", "fill-color", coroPaintExpression(metric));
+  map.setPaintProperty("comuni-fill", "fill-opacity", 0.78);
+}
+
+function clearCoroLayer() {
+  map.setPaintProperty("comuni-fill", "fill-opacity", 0);
+}
+
+// Etichette min/max per ciascuna delle 5 classi, dai breakpoint + range dei dati.
+function coroLegendRanges(metric) {
+  const def = METRIC_DEFS[metric];
+  const breaks = coroData[def.breaksKey];
+  const values = [...coroData.metrics.values()].map((m) => m[metric]).filter((v) => v !== null);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const edges = [min, ...breaks, max];
+  const ranges = [];
+  for (let i = 0; i < edges.length - 1; i++) ranges.push([edges[i], edges[i + 1]]);
+  return ranges;
+}
+
+function renderCoroLegend(metric) {
+  const def = METRIC_DEFS[metric];
+  const ranges = coroLegendRanges(metric); // 5 bande ascendenti [[e0,e1],[e1,e2],...,[e4,e5]]
+  const edges = [ranges[0][0], ...ranges.map(([, hi]) => hi)]; // 6 confini, dal minimo al massimo
+  const nodataCount = [...coroData.metrics.values()].filter((m) => m[metric] === null).length;
+  // colors[0] = valore più basso: la barra va letta dall'alto (basso) verso il basso (alto),
+  // le 6 etichette (spaziate con justify-content:space-between) segnano i confini delle 5 bande.
+  const barHtml = def.colors.map((c) => `<div style="background:${c}"></div>`).join("");
+  const labelsHtml = edges.map((v) => `<span>${def.format(v)}</span>`).join("");
+  document.getElementById("coroLegend").innerHTML = `
+    <div class="coro-leg-title">${esc(def.label)}</div>
+    <div class="coro-leg-unit">${esc(def.unit)}</div>
+    <div class="coro-leg-scale">
+      <div class="coro-leg-bar">${barHtml}</div>
+      <div class="coro-leg-labels">${labelsHtml}</div>
+    </div>
+    <div class="coro-leg-nodata"><i></i> Nessun dato (${fmt(nodataCount)} comuni)</div>
+  `;
+}
+
+// Coordinate (x,y) di un punto a distanza `radius` dal centro (cx,cy), all'angolo dato.
+function arcPoint(cx, cy, radius, angle) {
+  return [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)];
+}
+
+// Path SVG di una "fetta" di donut (anello, non spicchio pieno) tra due raggi.
+function donutArcPath(cx, cy, outerR, innerR, start, sweep) {
+  const end = start + sweep;
+  const [x1, y1] = arcPoint(cx, cy, outerR, start);
+  const [x2, y2] = arcPoint(cx, cy, outerR, end);
+  const [x3, y3] = arcPoint(cx, cy, innerR, end);
+  const [x4, y4] = arcPoint(cx, cy, innerR, start);
+  const largeArc = sweep > Math.PI ? 1 : 0;
+  return `M${x1},${y1} A${outerR},${outerR} 0 ${largeArc},1 ${x2},${y2} L${x3},${y3} A${innerR},${innerR} 0 ${largeArc},0 ${x4},${y4} Z`;
+}
+
+const DONUT_CLASS_LABELS = ["Classe 1 (bassa)", "Classe 2", "Classe 3", "Classe 4", "Classe 5 (alta)", "Nessun dato"];
+
+// Grafico a ciambella: quanti comuni ricadono in ciascuna delle 5 classi
+// (+ "nessun dato"), per vedere a colpo d'occhio se la distribuzione è
+// bilanciata (i quantili la rendono ~uguale per costruzione) o sbilanciata.
+function renderCoroDonut(metric) {
+  const def = METRIC_DEFS[metric];
+  const breaks = coroData[def.breaksKey];
+  const counts = classCounts(coroData.metrics, metric, breaks);
+  const nodataCount = [...coroData.metrics.values()].filter((m) => m[metric] === null).length;
+  const allCounts = [...counts, nodataCount];
+  const allColors = [...def.colors, NODATA_COLOR];
+  const total = allCounts.reduce((a, b) => a + b, 0);
+  const segments = donutSegments(allCounts);
+  const R = 45, r = 28, cx = 65, cy = 65;
+
+  const pathsHtml = segments
+    .map((seg, i) => (allCounts[i] > 0 ? `<path d="${donutArcPath(cx, cy, R, r, seg.start, seg.sweep)}" fill="${allColors[i]}" opacity="0.92"/>` : ""))
+    .join("");
+
+  const legRowsHtml = allCounts
+    .map((n, i) => {
+      if (n === 0) return "";
+      const pct = total > 0 ? ((n / total) * 100).toFixed(0) : "0";
+      const barW = total > 0 ? Math.round((n / total) * 40) : 0;
+      return `<div class="coro-donut-leg-row">
+        <div class="coro-donut-dot" style="background:${allColors[i]}"></div>
+        <span class="coro-donut-leg-label">${esc(DONUT_CLASS_LABELS[i])}</span>
+        <div class="coro-donut-leg-bar-wrap"><div class="coro-donut-leg-bar" style="width:${barW}px;background:${allColors[i]}"></div></div>
+        <span class="coro-donut-leg-count">${fmt(n)}</span>
+        <span class="coro-donut-leg-pct">${pct}%</span>
+      </div>`;
+    })
+    .join("");
+
+  document.getElementById("coroDonut").innerHTML = `
+    <div class="coro-donut-card">
+      <div class="coro-donut-svg-wrap">
+        <svg class="coro-donut-svg" viewBox="0 0 130 130">
+          ${pathsHtml}
+          <text x="${cx}" y="${cy - 5}" text-anchor="middle" class="coro-donut-total">${fmt(total)}</text>
+          <text x="${cx}" y="${cy + 11}" text-anchor="middle" class="coro-donut-sublabel">comuni</text>
+        </svg>
+      </div>
+      <div class="coro-donut-legend">${legRowsHtml}</div>
+    </div>
+  `;
+}
+
+// Righe cliccabili: click centra la mappa sul comune (stesso flyTo usato dalla
+// ricerca geografica) e apre il popup con il valore della metrica attiva.
+function coroRankRowsHtml(list, def) {
+  const maxAbs = Math.max(...list.map((d) => Math.abs(d.value)), 1);
+  return list
+    .map((d, i) => {
+      const share = (Math.abs(d.value) / maxAbs) * 100;
+      const barCls = d.value < 0 ? "neg" : "";
+      return `<div class="coro-rank-row" data-procom="${d.id}">
+        <div class="rank-top">
+          <span class="rank-idx">${i + 1}</span>
+          <span class="rank-name">${esc(nomeComune(d.id))}</span>
+          <span class="rank-val">${def.format(d.value)}</span>
+        </div>
+        <div class="bar"><i class="${barCls}" style="width:${share.toFixed(1)}%"></i></div>
+      </div>`;
+    })
+    .join("");
+}
+
+function renderCoroRanking(metric) {
+  const def = METRIC_DEFS[metric];
+  const { top, bottom } = topBottom(coroData.metrics, metric, 10);
+  document.getElementById("coroRanking").innerHTML = `
+    <div class="coro-rank-section">
+      <h4>Top 10 — valore più alto</h4>
+      ${coroRankRowsHtml(top, def)}
+    </div>
+    <div class="coro-rank-section">
+      <h4>Top 10 — valore più basso</h4>
+      ${coroRankRowsHtml(bottom, def)}
+    </div>
+  `;
+  document.querySelectorAll("#coroRanking .coro-rank-row").forEach((row) => {
+    row.addEventListener("click", () => {
+      const proCom = Number(row.dataset.procom);
+      const pos = point(proCom);
+      if (!pos) return;
+      map.flyTo({ center: pos, zoom: Math.max(map.getZoom(), 10) });
+      showCoroPopup(proCom, nomeComune(proCom), pos);
+    });
+  });
+}
+
+function setActiveMetric(metric) {
+  activeMetric = metric;
+  document.querySelectorAll("#coroLayerBtns .layer-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.metric === metric);
+  });
+  applyCoroLayer(metric);
+  renderCoroLegend(metric);
+  renderCoroDonut(metric);
+  renderCoroRanking(metric);
+}
+
+function setActivePanelTab(tab) {
+  activePanelTab = tab;
+  document.getElementById("panelTabFlussi").classList.toggle("active", tab === "flussi");
+  document.getElementById("panelTabCoro").classList.toggle("active", tab === "coro");
+  document.getElementById("panel-view-flussi").classList.toggle("active", tab === "flussi");
+  document.getElementById("panel-view-coro").classList.toggle("active", tab === "coro");
+  if (!mapLoaded) return; // il tab può essere cliccato prima che la mappa/i dati siano pronti
+  if (tab === "coro") {
+    setBaseLayers([]);
+    applyCoroFeatureState();
+    if (coroData) {
+      applyCoroLayer(activeMetric);
+      renderCoroLegend(activeMetric);
+      renderCoroDonut(activeMetric);
+      renderCoroRanking(activeMetric);
+    }
+  } else {
+    clearCoroLayer();
+    if (dataLoaded) updateFlowView();
+  }
+}
+
+document.getElementById("panelTabFlussi").addEventListener("click", () => setActivePanelTab("flussi"));
+document.getElementById("panelTabCoro").addEventListener("click", () => setActivePanelTab("coro"));
+document.querySelectorAll("#coroLayerBtns .layer-btn").forEach((btn) => {
+  btn.addEventListener("click", () => setActiveMetric(btn.dataset.metric));
+});
+
+// Tooltip hover: nome comune + valore della metrica attiva quando il tab
+// Coroplettiche è aperto, altrimenti solo il nome (comportamento invariato).
+function updateHoverTooltip(point, proCom, comuneName) {
+  if (activePanelTab === "coro" && coroData) {
+    const m = coroData.metrics.get(proCom);
+    const def = METRIC_DEFS[activeMetric];
+    const val = m ? m[activeMetric] : null;
+    hoverTooltip.classList.add("coro");
+    hoverTooltip.innerHTML = `${esc(comuneName)}<span class="coro-val">${def.label}: ${val === null ? "nessun dato" : def.format(val)}</span>`;
+  } else {
+    hoverTooltip.classList.remove("coro");
+    hoverTooltip.textContent = comuneName;
+  }
+  hoverTooltip.style.left = `${point.x}px`;
+  hoverTooltip.style.top = `${point.y}px`;
+  hoverTooltip.style.display = "block";
+}
+
+function showCoroPopup(proCom, comuneName, lngLat) {
+  const m = coroData.metrics.get(proCom);
+  const def = METRIC_DEFS[activeMetric];
+  const val = m ? m[activeMetric] : null;
+  showPopup(lngLat, `
+    <strong>${esc(comuneName)}</strong>
+    <p>${esc(def.label)}: ${val === null ? "nessun dato" : def.format(val)}</p>
+  `);
+}

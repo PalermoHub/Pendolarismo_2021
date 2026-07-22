@@ -31,6 +31,84 @@ html, body { height: 100%; font-family: 'Titillium Web', system-ui, sans-serif; 
 #panelTitle { font-size: 18px; font-weight: 700; color: #ff9900; margin-bottom: 2px; }
 #panelSubtitle { font-size: 11.5px; color: #999; margin-bottom: 10px; }
 #panelNote a { color: #ff9070; }
+
+/* ── PANEL TAB BAR (Flussi / Coroplettiche) ─────────────────────────── */
+.panel-tabbar {
+  display: flex; margin: -12px -14px 12px; border-bottom: 1px solid rgba(255,255,255,.15);
+}
+.panel-tab {
+  flex: 1; padding: 10px 6px; font-family: inherit; font-size: 12px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em; color: #999; background: transparent;
+  border: none; border-bottom: 2px solid transparent; cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.panel-tab:hover { color: #f0f0f0; background: rgba(255,255,255,.05); }
+.panel-tab.active { color: #ff9900; border-bottom-color: #ff9900; }
+.panel-tab + .panel-tab { border-left: 1px solid rgba(255,255,255,.15); }
+
+.panel-view { display: none; }
+.panel-view.active { display: block; }
+
+/* ── COROPLETTICHE: pulsanti layer ──────────────────────────────────── */
+#coroLayerBtns { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 14px; }
+.layer-btn {
+  display: flex; align-items: center; gap: 8px; padding: 9px 10px;
+  border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;
+  color: #ccc; background: rgba(255,255,255,.05); border: 1.5px solid rgba(255,255,255,.12);
+  transition: background .15s, color .15s, border-color .15s;
+}
+.layer-btn:hover { color: #f0f0f0; background: rgba(255,255,255,.09); }
+.layer-btn.active { color: #fff; background: rgba(255,153,0,.18); border-color: #ff9900; }
+.layer-swatch { width: 26px; height: 8px; border-radius: 3px; flex-shrink: 0; }
+
+/* ── COROPLETTICHE: legenda ─────────────────────────────────────────── */
+#coroLegend { font-size: 11px; }
+.coro-leg-title { font-size: 11px; font-weight: 700; color: #f0f0f0; margin-bottom: 1px; }
+.coro-leg-unit { font-size: 9.5px; color: #999; margin-bottom: 8px; }
+.coro-leg-scale { display: flex; gap: 8px; align-items: stretch; margin-bottom: 8px; }
+.coro-leg-bar { display: flex; flex-direction: column; width: 16px; border-radius: 3px; overflow: hidden; }
+.coro-leg-bar div { flex: 1; min-height: 16px; }
+.coro-leg-labels { display: flex; flex-direction: column; justify-content: space-between; }
+.coro-leg-labels span { font-size: 10px; color: #999; line-height: 1; }
+.coro-leg-nodata { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #999; }
+.coro-leg-nodata i { width: 14px; height: 14px; border-radius: 3px; background: #3a3a42; flex-shrink: 0; }
+
+/* ── COROPLETTICHE: donut chart distribuzione classi ────────────────── */
+.coro-donut-card { margin: 12px 0 14px; }
+.coro-donut-svg-wrap { display: flex; justify-content: center; margin-bottom: 8px; }
+.coro-donut-svg { width: 100%; height: auto; max-width: 150px; display: block; overflow: visible; }
+.coro-donut-total { font-size: 15px; font-weight: 700; fill: #f0f0f0; font-family: inherit; }
+.coro-donut-sublabel { font-size: 8px; fill: #999; font-family: inherit; text-transform: uppercase; letter-spacing: .05em; }
+.coro-donut-legend { display: flex; flex-direction: column; gap: 2px; }
+.coro-donut-leg-row { display: flex; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 5px; }
+.coro-donut-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.coro-donut-leg-label { font-size: 10px; color: #ccc; flex: 1; }
+.coro-donut-leg-bar-wrap { width: 40px; height: 3px; background: rgba(255,255,255,.12); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+.coro-donut-leg-bar { height: 100%; border-radius: 2px; }
+.coro-donut-leg-count { font-size: 10px; color: #e8e8e8; font-weight: 600; min-width: 26px; text-align: right; }
+.coro-donut-leg-pct { font-size: 10px; color: #999; min-width: 32px; text-align: right; }
+
+/* ── COROPLETTICHE: ranking top/bottom ──────────────────────────────── */
+.coro-rank-section { margin-top: 14px; }
+.coro-rank-section h4 {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  color: #999; margin: 0 0 4px;
+}
+.coro-rank-row {
+  padding: 3px 2px; font-size: 11.5px; cursor: pointer; border-radius: 4px;
+}
+.coro-rank-row:hover { background: rgba(255,255,255,.07); }
+.coro-rank-row .rank-top { display: flex; align-items: baseline; gap: 6px; margin-bottom: 2px; }
+.coro-rank-row .rank-idx { color: #666; flex-shrink: 0; width: 14px; text-align: right; }
+.coro-rank-row .rank-name { color: #e8e8e8; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coro-rank-row .rank-val { color: #ff9900; font-weight: 600; flex-shrink: 0; }
+.coro-rank-row .bar { margin-left: 20px; }
+.coro-rank-row .bar i { background: #ff9900; }
+.coro-rank-row .bar i.neg { background: #3d7fff; }
+
+/* ── TOOLTIP 2 righe (nome comune + valore coropletica) ─────────────── */
+.comune-hover-tooltip.coro { white-space: normal; text-align: center; line-height: 1.4; }
+.comune-hover-tooltip.coro .coro-val { display: block; font-weight: 400; color: #ffcc70; font-size: 11px; }
 .dest { font-size: 12px; padding: 3px 0; }
 .dest .top { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 2px; }
 .dest .pct { color: #999; flex: none; }

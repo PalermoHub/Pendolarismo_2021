@@ -1,9 +1,15 @@
+
+
+
+
+
+
 <!DOCTYPE html>
 <html lang="it">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Pendolarismo per lavoro 2021 - Flussi tra comuni italiani</title>
+<title>Pendolarismo lavoro 2021</title>
 <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"
   integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous" />
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"
@@ -12,8 +18,7 @@
   integrity="sha384-4sbA4B4Oqxkzs6apu8HaZcGrL3BySmt0tO/LQf6al3hkgq8ijZFxkTkvxxZZ/3PU" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/deck.gl@9.0.35/dist.min.js"
   integrity="sha384-Vr15y1r5cZ83amAjUB8zTA39xVjYBmxu/q5yF+gyhKdcf73hnNmOA1FkvIZGqLmX" crossorigin="anonymous"></script>
-    <meta name="keywords" content="pendolarismo, lavoro, ISTAT 2021, mobilità, flussi, comuni, Italia, Sicilia, Palermo, open data, mappa interattiva">
-   <meta name="description" content="Mappa interattiva dei flussi di pendolarismo per lavoro in Italia (dati ISTAT 2021): entrate, uscite e collegamenti tra comuni, filtrabili per regione, provincia e comune.">
+      <meta name="keywords" content="Open Data, Sicilia, PAI, Geologia, istat, pendolarismmo, Palermo">
     <meta name="author" content="Giovan Battista Vitrano per OpenDataSicilia.it">
     <meta http-equiv="content-language" content="IT">
     <meta name="robots" content="index,follow">
@@ -25,20 +30,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,200;0,300;0,400;0,600;0,700;0,900;1,400&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/style.css" />
 
-    <!-- Meta tags per social sharing pen Graph Protocol -->
-    <meta property="og:url" content="https://palermohub.github.io/Pendolarismo_2021">
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="Pendolarismo per lavoro 2021 - Flussi tra comuni italiani">
-    <meta property="og:description" content="Palermo Hub - Contenitore di mappe su Palermo realizzato da OpenDataSicilia.it">
-    <meta property="og:image" content="https://palermohub.github.io/Pendolarismo_2021/img/social_card.jpg">
-	<!-- twitter -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta property="twitter:domain" content="palermohub.opendatasicilia.it">
-    <meta property="twitter:url" content="https://palermohub.github.io/Pendolarismo_2021">
-    <meta name="twitter:title" content="Pendolarismo per lavoro 2021 - Flussi tra comuni italiani">
-    <meta name="twitter:description" content="Palermo Hub - Contenitore di mappe su Palermo realizzato da OpenDataSicilia.it">
-    <meta name="twitter:image" content="https://palermohub.github.io/Pendolarismo_2021/img/social_card.jpg">
-	
+
 	 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-KHR1GHDRQS"></script>
 <script>
@@ -152,10 +144,38 @@
 </div>
 
 <aside id="panel">
-  <div id="panelBody">
-    <p id="panelEmpty">Clicca un comune sulla mappa.</p>
+  <div class="panel-tabbar">
+    <button class="panel-tab active" id="panelTabFlussi" data-ptab="flussi">Flussi</button>
+    <button class="panel-tab" id="panelTabCoro" data-ptab="coro">Coroplettiche</button>
   </div>
-  <p id="panelNote">Vista globale ispirata dalla mappa di <a href="https://gjrichter.github.io/pages/DataVizi/FUA/index_pendolari_2021_arcs_saldo_sum_FUA_dark.html" target="_blank" rel="noopener">Gueter Richer</a></p>
+
+  <div class="panel-view active" id="panel-view-flussi">
+    <div id="panelBody">
+      <p id="panelEmpty">Clicca un comune sulla mappa.</p>
+    </div>
+    <p id="panelNote">Vista globale ispirata dalla mappa di <a href="https://gjrichter.github.io/pages/DataVizi/FUA/index_pendolari_2021_arcs_saldo_sum_FUA_dark.html" target="_blank" rel="noopener">Gueter Richer</a></p>
+  </div>
+
+  <div class="panel-view" id="panel-view-coro">
+    <p id="coroIntro" class="hint">Mappe coropletiche per comune: seleziona un indicatore. Passa il mouse su un comune per il valore, i comuni in grigio non hanno dati sufficienti.</p>
+    <div id="coroLayerBtns">
+      <div class="layer-btn active" id="lbtn-autocontenimento" data-metric="autocontenimento">
+        <div class="layer-swatch" style="background:linear-gradient(90deg,#fef0d9,#b30000)"></div>
+        Autocontenimento
+      </div>
+      <div class="layer-btn" id="lbtn-saldo" data-metric="saldo">
+        <div class="layer-swatch" style="background:linear-gradient(90deg,#ff4400,#3d7fff)"></div>
+        Saldo pendolarismo
+      </div>
+      <div class="layer-btn" id="lbtn-intensita" data-metric="intensita">
+        <div class="layer-swatch" style="background:linear-gradient(90deg,#ffffcc,#006837)"></div>
+        Intensità pendolarismo
+      </div>
+    </div>
+    <div id="coroLegend"></div>
+    <div id="coroDonut"></div>
+    <div id="coroRanking"></div>
+  </div>
 </aside>
 <a id="odsLogo" href="https://opendatasicilia.it/" target="_blank" rel="noopener" title="Open Data Sicilia">
   <img src="img/opendatasicilia.png" alt="Open Data Sicilia" />
@@ -289,6 +309,17 @@
           <li>Usa il selettore <strong>Entrambi</strong> per vedere sia chi esce che chi entra, oppure isola solo <strong>Entrata</strong> per vedere da dove arrivano i lavoratori</li>
           <li>Se vuoi vedere anche i collegamenti con comuni fuori dalla Sicilia, attiva <strong>Mostra tutti i collegamenti del comune</strong></li>
         </ol>
+
+        <hr class="analisi-sep">
+
+        <h3 class="analisi-h3">Tab "Coroplettiche"</h3>
+        <p class="info-text">Nel pannello di destra, accanto a "Flussi", trovi il tab <strong>Coroplettiche</strong>: colora ogni comune secondo uno di 3 indicatori, invece di mostrare gli archi.</p>
+        <ul class="analisi-list">
+          <li><strong>Autocontenimento lavorativo</strong> — percentuale di occupati residenti che lavorano nello stesso comune in cui abitano. Alto = comune "autosufficiente" dal punto di vista occupazionale.</li>
+          <li><strong>Saldo pendolarismo</strong> — entrate meno uscite, stessa logica e stessi colori (blu = polo di lavoro, arancio = polo residenziale) del saldo netto già visto nelle card del pannello.</li>
+          <li><strong>Intensità pendolarismo</strong> — pendolari in uscita rispetto alla popolazione residente. I comuni della <strong>Sardegna</strong> sono mostrati in grigio ("nessun dato") perché la fonte usata per la popolazione residente non li copre.</li>
+        </ul>
+        <p class="info-text">Ogni mappa usa 5 classi di colore a <strong>quantili</strong>: ogni classe raggruppa circa lo stesso numero di comuni, non lo stesso intervallo di valori — così anche indicatori con pochi valori estremi restano leggibili. Passa il mouse su un comune per vedere il suo valore, clicca per un popup con lo stesso dato.</p>
       </div>
     </div>
 
