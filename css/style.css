@@ -103,6 +103,8 @@ html, body { height: 100%; font-family: 'Titillium Web', system-ui, sans-serif; 
 }
 .flow-popup .maplibregl-popup-content strong { color: #3d7fff; font-size: 13px; }
 .flow-popup .maplibregl-popup-content p { margin: 4px 0 0; }
+.flow-popup .maplibregl-popup-content p.pos { color: #3d7fff; font-weight: 600; }
+.flow-popup .maplibregl-popup-content p.neg { color: #ff9900; font-weight: 600; }
 .flow-popup .maplibregl-popup-tip { border-top-color: #0a0a0f; border-bottom-color: #0a0a0f; }
 .flow-popup .maplibregl-popup-close-button { color: #f0f0f0; }
 

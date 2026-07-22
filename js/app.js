@@ -675,7 +675,7 @@ function renderScopePanel(ids, title, scopeType) {
     <p>Pendolari in uscita verso ${altre}: ${fmt(externalOut)}</p>
     <p>Pendolari in entrata da ${altre}: ${fmt(externalIn)}</p>
     <h3>Saldo pendolari (entrata − uscita verso ${altre})</h3>
-    <p class="hint">Positivo = polo lavoro (attrae); negativo = dormitorio (esporta forza lavoro).</p>
+    <p class="hint">Positivo = polo lavoro (attrae); negativo = polo residenziale (esporta forza lavoro).</p>
     ${divergingHtml(saldoRanking(), nomeComune)}
     <h3>Classifica comuni per uscita verso ${altre}</h3>
     ${rankingHtml(ranking("out"), externalOut, "out", "out")}
@@ -822,7 +822,7 @@ function bubbleRadius(v) {
 }
 
 // Saldo pendolari del comune: positivo = polo lavoro (entrano più occupati di quanti
-// residenti escono), negativo = dormitorio (escono più residenti di quanti occupati entrano).
+// residenti escono), negativo = polo residenziale (escono più residenti di quanti occupati entrano).
 // Stessa logica/palette del bar divergente (blu #3d7fff pos, arancio #ff4400 neg).
 function saldoValue(proComId) {
   const t = flowIndex.totals.get(proComId) ?? { out: 0, in: 0, self: 0 };
@@ -1052,10 +1052,14 @@ function onComuneClick(proCom, comuneName, lngLat) {
   syncFiltersToComune(proCom);
 
   const totals = flowIndex.totals.get(proCom) ?? { out: 0, in: 0, self: 0 };
+  const saldo = totals.in - totals.out;
+  const saldoCls = saldo >= 0 ? "pos" : "neg";
+  const saldoLabel = saldo >= 0 ? "Polo lavoro" : "Polo residenziale";
   showPopup(lngLat, `
     <strong>${esc(comuneName)}</strong>
     <p>Pendolari in uscita: ${fmt(totals.out)}</p>
     <p>Pendolari in entrata: ${fmt(totals.in)}</p>
+    <p class="${saldoCls}">Saldo: ${saldo >= 0 ? "+" : ""}${fmt(saldo)} &mdash; ${saldoLabel}</p>
   `);
 }
 
