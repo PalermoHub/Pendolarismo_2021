@@ -1328,9 +1328,32 @@ function coroPaintExpression(metric) {
   return expr;
 }
 
+// La legenda coropletica funge da filtro per classe, interconnesso con la
+// mappa, il donut e il ranking: disattivare una classe la attenua ovunque.
+// Si azzera a ogni cambio di metrica (le classi non sono confrontabili tra metriche).
+// Nessuna classe selezionata = mostra tutto. Appena selezioni ≥1 classe,
+// si vede solo quella selezione (isolamento, non esclusione).
+let coroSelectedClasses = new Set();
+
+function resetCoroClassFilters() {
+  coroSelectedClasses = new Set();
+}
+
+function coroClassVisible(key) {
+  return coroSelectedClasses.size === 0 || coroSelectedClasses.has(key);
+}
+
+function coroOpacityExpression(metric) {
+  const def = METRIC_DEFS[metric];
+  const expr = ["match", ["feature-state", def.featureStateKey]];
+  def.colors.forEach((color, i) => expr.push(i, coroClassVisible(i) ? 0.78 : 0.06));
+  expr.push(coroClassVisible("nodata") ? 0.78 : 0.06);
+  return expr;
+}
+
 function applyCoroLayer(metric) {
   map.setPaintProperty("comuni-fill", "fill-color", coroPaintExpression(metric));
-  map.setPaintProperty("comuni-fill", "fill-opacity", 0.78);
+  map.setPaintProperty("comuni-fill", "fill-opacity", coroOpacityExpression(metric));
 }
 
 function clearCoroLayer() {
@@ -1350,25 +1373,44 @@ function coroLegendRanges(metric) {
   return ranges;
 }
 
-function renderCoroLegend(metric) {
+function coroLegendHtml(metric) {
   const def = METRIC_DEFS[metric];
   const ranges = coroLegendRanges(metric); // 5 bande ascendenti [[e0,e1],[e1,e2],...,[e4,e5]]
   const edges = [ranges[0][0], ...ranges.map(([, hi]) => hi)]; // 6 confini, dal minimo al massimo
   const nodataCount = [...coroData.metrics.values()].filter((m) => m[metric] === null).length;
   // colors[0] = valore più basso: la barra va letta dall'alto (basso) verso il basso (alto),
   // le 6 etichette (spaziate con justify-content:space-between) segnano i confini delle 5 bande.
-  const barHtml = def.colors.map((c) => `<div style="background:${c}"></div>`).join("");
+  // Ogni banda è cliccabile: funge da filtro di classe interconnesso con mappa/donut/ranking.
+  const barHtml = def.colors
+    .map((c, i) => `<div data-cls="${i}" class="${coroClassVisible(i) ? "" : "off"}" style="background:${c}" title="Classe ${i + 1}: clic per isolare"></div>`)
+    .join("");
   const labelsHtml = edges.map((v) => `<span>${def.format(v)}</span>`).join("");
-  document.getElementById("coroLegend").innerHTML = `
+  return `
     <div class="coro-leg-title">${esc(def.label)}</div>
     <div class="coro-leg-unit">${esc(def.unit)}</div>
     <div class="coro-leg-scale">
       <div class="coro-leg-bar">${barHtml}</div>
       <div class="coro-leg-labels">${labelsHtml}</div>
     </div>
-    <div class="coro-leg-nodata"><i></i> Nessun dato (${fmt(nodataCount)} comuni)</div>
+    <div class="coro-leg-nodata${coroClassVisible("nodata") ? "" : " off"}" data-cls="nodata" title="Nessun dato: clic per isolare"><i></i> Nessun dato (${fmt(nodataCount)} comuni)</div>
   `;
 }
+
+function renderCoroLegend(metric) {
+  document.getElementById("coroMapLegend").innerHTML = coroLegendHtml(metric);
+}
+
+document.getElementById("coroMapLegend").addEventListener("click", (e) => {
+  const el = e.target.closest("[data-cls]");
+  if (!el || !coroData) return;
+  const key = el.dataset.cls === "nodata" ? "nodata" : Number(el.dataset.cls);
+  if (coroSelectedClasses.has(key)) coroSelectedClasses.delete(key);
+  else coroSelectedClasses.add(key);
+  applyCoroLayer(activeMetric);
+  renderCoroLegend(activeMetric);
+  renderCoroDonut(activeMetric);
+  renderCoroRanking(activeMetric);
+});
 
 // Coordinate (x,y) di un punto a distanza `radius` dal centro (cx,cy), all'angolo dato.
 function arcPoint(cx, cy, radius, angle) {
@@ -1394,8 +1436,9 @@ const DONUT_CLASS_LABELS = ["Classe 1 (bassa)", "Classe 2", "Classe 3", "Classe 
 function renderCoroDonut(metric) {
   const def = METRIC_DEFS[metric];
   const breaks = coroData[def.breaksKey];
-  const counts = classCounts(coroData.metrics, metric, breaks);
-  const nodataCount = [...coroData.metrics.values()].filter((m) => m[metric] === null).length;
+  // Le classi disattivate dalla legenda escono dal conteggio: donut interconnesso al filtro.
+  const counts = classCounts(coroData.metrics, metric, breaks).map((n, i) => (coroClassVisible(i) ? n : 0));
+  const nodataCount = coroClassVisible("nodata") ? [...coroData.metrics.values()].filter((m) => m[metric] === null).length : 0;
   const allCounts = [...counts, nodataCount];
   const allColors = [...def.colors, NODATA_COLOR];
   const total = allCounts.reduce((a, b) => a + b, 0);
@@ -1457,7 +1500,12 @@ function coroRankRowsHtml(list, def) {
 
 function renderCoroRanking(metric) {
   const def = METRIC_DEFS[metric];
-  const { top, bottom } = topBottom(coroData.metrics, metric, 10);
+  const breaks = coroData[def.breaksKey];
+  // Ranking interconnesso al filtro di classe: i comuni delle classi disattivate non compaiono.
+  const filteredMetrics = new Map(
+    [...coroData.metrics].filter(([, m]) => m[metric] !== null && coroClassVisible(classify(m[metric], breaks)))
+  );
+  const { top, bottom } = topBottom(filteredMetrics, metric, 10);
   document.getElementById("coroRanking").innerHTML = `
     <div class="coro-rank-section">
       <h4>Top 10 — valore più alto</h4>
@@ -1481,6 +1529,7 @@ function renderCoroRanking(metric) {
 
 function setActiveMetric(metric) {
   activeMetric = metric;
+  resetCoroClassFilters();
   document.querySelectorAll("#coroLayerBtns .layer-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.metric === metric);
   });
@@ -1496,6 +1545,8 @@ function setActivePanelTab(tab) {
   document.getElementById("panelTabCoro").classList.toggle("active", tab === "coro");
   document.getElementById("panel-view-flussi").classList.toggle("active", tab === "flussi");
   document.getElementById("panel-view-coro").classList.toggle("active", tab === "coro");
+  document.getElementById("legend").style.display = tab === "flussi" ? "" : "none";
+  document.getElementById("coroMapLegend").style.display = tab === "coro" ? "" : "none";
   if (!mapLoaded) return; // il tab può essere cliccato prima che la mappa/i dati siano pronti
   if (tab === "coro") {
     setBaseLayers([]);
