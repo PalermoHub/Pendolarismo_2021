@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pendolarismo lavoro 2021</title>
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"
+  integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"
+  integrity="sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/pmtiles@3.0.6/dist/pmtiles.js"
+  integrity="sha384-4sbA4B4Oqxkzs6apu8HaZcGrL3BySmt0tO/LQf6al3hkgq8ijZFxkTkvxxZZ/3PU" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/deck.gl@9.0.35/dist.min.js"
+  integrity="sha384-Vr15y1r5cZ83amAjUB8zTA39xVjYBmxu/q5yF+gyhKdcf73hnNmOA1FkvIZGqLmX" crossorigin="anonymous"></script>
+      <meta name="keywords" content="Open Data, Sicilia, PAI, Geologia, istat, pendolarismmo, Palermo">
+    <meta name="author" content="Giovan Battista Vitrano per OpenDataSicilia.it">
+    <meta http-equiv="content-language" content="IT">
+    <meta name="robots" content="index,follow">
+    <meta name="creation_Date" content="22/07/2026">
+    <link rel="shortcut icon" href="img/favicon.ico"/>
+    <link rel="icon" href="img/favicon.png" type="image/png"/>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div id="map"></div>
+<div id="legend">
+  <h3>Legenda <span id="legendHint">(clic per filtrare)</span></h3>
+  <div class="legend-row" data-kind="out"><i class="swatch line" style="background:#ff4400"></i> Uscita (residenti verso altri comuni)</div>
+  <div class="legend-row" data-kind="in"><i class="swatch line" style="background:#fbeb7c"></i> Entrata (occupati da altri comuni)</div>
+  <div class="legend-row" data-kind="internal"><i class="swatch dot" style="background:#0000dd"></i> Flusso interno all'area / nodo misto</div>
+  <div class="legend-row" data-kind="external"><i class="swatch dot" style="background:#b4b4b4"></i> Comune collegato (fuori area)</div>
+  <div class="legend-row legend-static"><i class="swatch dot" style="background:#3d7fff"></i> Comune selezionato</div>
+</div>
+<aside id="panel">
+  <div id="geoFilters">
+    <select id="filterRegione"><option value="">Tutte le regioni</option></select>
+    <select id="filterProvincia" disabled><option value="">Tutte le province</option></select>
+    <select id="filterComune" disabled><option value="">Seleziona comune</option></select>
+  </div>
+  <div id="allToggle">
+    <label><input type="checkbox" id="showAllFlows" checked /> Mostra tutti i collegamenti</label>
+    <label><input type="checkbox" id="showNodes" checked /> Mostra punti sui comuni</label>
+  </div>
+  <div id="directionToggle">
+    <label><input type="radio" name="dir" value="out" /> Uscita</label>
+    <label><input type="radio" name="dir" value="in" /> Entrata</label>
+    <label><input type="radio" name="dir" value="both" checked /> Entrambi</label>
+  </div>
+  <div id="comuneToggle">
+    <label><input type="checkbox" id="showAllComuneLinks" /> Mostra tutti i collegamenti del comune</label>
+  </div>
+  <div id="panelBody">
+    <p id="panelEmpty">Clicca un comune sulla mappa.</p>
+  </div>
+</aside>
+<a id="odsLogo" href="https://opendatasicilia.it/" target="_blank" rel="noopener" title="Open Data Sicilia">
+  <img src="img/opendatasicilia.png" alt="Open Data Sicilia" />
+</a>
+
+<script type="module" src="js/app.js"></script>
+
+</body>
+</html>
