@@ -26,6 +26,7 @@ async function loadData() {
   geo = geoData;
   dataLoaded = true;
   initGeoFilters();
+  buildGeoSuggestions();
   tryInitialRender();
 }
 
@@ -178,6 +179,7 @@ function tryInitialRender() {
 function resetGeoFilters() {
   filterRegione.value = "";
   populateProvince(null);
+  updateChips();
 }
 
 const filterRegione = document.getElementById("filterRegione");
@@ -217,6 +219,7 @@ filterRegione.addEventListener("change", (e) => {
   const codReg = e.target.value ? Number(e.target.value) : null;
   populateProvince(codReg);
   updateFlowView();
+  updateChips();
 });
 
 filterProvincia.addEventListener("change", (e) => {
@@ -228,12 +231,14 @@ filterProvincia.addEventListener("change", (e) => {
     filterComune.disabled = true;
   }
   updateFlowView();
+  updateChips();
 });
 
 filterComune.addEventListener("change", (e) => {
   if (!e.target.value) {
     selectedProCom = null;
     updateFlowView();
+    updateChips();
     return;
   }
   const proCom = Number(e.target.value);
@@ -241,6 +246,7 @@ filterComune.addEventListener("change", (e) => {
   if (!pos) return;
   map.flyTo({ center: pos, zoom: Math.max(map.getZoom(), 10) });
   onComuneClick(proCom, nomeComune(proCom), pos);
+  updateChips();
 });
 
 // Scope attivo determinato dai select: comune > provincia > regione > vista globale (toggle).
@@ -250,6 +256,173 @@ function currentScope() {
   if (filterRegione.value) return { type: "regione", id: Number(filterRegione.value) };
   return { type: "all" };
 }
+
+// ── Barra di ricerca intelligente (regione/provincia/comune) ───────────
+const geoSearchInput   = document.getElementById("geoSearchInput");
+const geoSearchClear   = document.getElementById("geoSearchClear");
+const geoSearchDD      = document.getElementById("geoSearchDD");
+const geoChips         = document.getElementById("geoChips");
+const geoFilterBtn     = document.getElementById("geoFilterBtn");
+const geoFilterBadge   = document.getElementById("geoFilterBadge");
+const geoFilterOverlay = document.getElementById("geoFilterOverlay");
+const geoFilterModal   = document.getElementById("geoFilterModal");
+const geoModalClose    = document.getElementById("geoModalClose");
+const geoModalReset    = document.getElementById("geoModalReset");
+const geoModalApply    = document.getElementById("geoModalApply");
+
+const GEO_TYPE_LABELS = { regione: "Regione", provincia: "Provincia", comune: "Comune" };
+let GEO_SUGGESTIONS = [];
+
+function buildGeoSuggestions() {
+  const items = [];
+  for (const r of geo.regioni) {
+    items.push({ type: "regione", label: r.nome, value: r.cod });
+  }
+  for (const p of geo.province) {
+    const rNome = geo.regioni.find((r) => r.cod === p.cod_reg)?.nome ?? "";
+    items.push({ type: "provincia", label: `${p.nome} (${p.sigla})`, sub: rNome, value: p.cod, regCod: p.cod_reg });
+  }
+  for (const [id, [codReg, codProv]] of Object.entries(geo.comuni)) {
+    items.push({ type: "comune", label: nomeComune(Number(id)), value: Number(id), regCod: codReg, provCod: codProv });
+  }
+  GEO_SUGGESTIONS = items;
+}
+
+function geoHighlight(text, query) {
+  const safe = esc(text);
+  if (!query) return safe;
+  const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+  return safe.replace(re, "<mark>$1</mark>");
+}
+
+function renderGeoDD(query) {
+  const q = query.trim().toLowerCase();
+  const matches = q.length === 0 ? [] : GEO_SUGGESTIONS
+    .filter((s) => s.label.toLowerCase().includes(q))
+    .sort((a, b) => a.label.toLowerCase().indexOf(q) - b.label.toLowerCase().indexOf(q))
+    .slice(0, 12);
+
+  if (matches.length === 0) {
+    geoSearchDD.innerHTML = q.length > 0
+      ? `<div class="geo-dd-empty">Nessun risultato per &ldquo;${esc(q)}&rdquo;</div>`
+      : "";
+    geoSearchDD.classList.toggle("open", q.length > 0);
+    return;
+  }
+
+  let html = "";
+  let lastType = null;
+  matches.forEach((m, i) => {
+    if (m.type !== lastType) {
+      html += `<div class="geo-dd-cat">${GEO_TYPE_LABELS[m.type]}</div>`;
+      lastType = m.type;
+    }
+    html += `<div class="geo-dd-item" data-idx="${i}">
+               <span>${geoHighlight(m.label, query.trim())}${m.sub ? ` <span style="color:#999">· ${esc(m.sub)}</span>` : ""}</span>
+               <span class="geo-dd-badge">${esc(GEO_TYPE_LABELS[m.type])}</span>
+             </div>`;
+  });
+  geoSearchDD.innerHTML = html;
+  geoSearchDD.classList.add("open");
+
+  geoSearchDD.querySelectorAll(".geo-dd-item").forEach((el, i) => {
+    el.addEventListener("click", () => selectGeoSuggestion(matches[i]));
+  });
+}
+
+function selectGeoSuggestion(item) {
+  if (item.type === "regione") {
+    filterRegione.value = String(item.value);
+    filterRegione.dispatchEvent(new Event("change"));
+  } else if (item.type === "provincia") {
+    filterRegione.value = String(item.regCod);
+    filterRegione.dispatchEvent(new Event("change"));
+    filterProvincia.value = String(item.value);
+    filterProvincia.dispatchEvent(new Event("change"));
+  } else if (item.type === "comune") {
+    filterRegione.value = String(item.regCod);
+    filterRegione.dispatchEvent(new Event("change"));
+    filterProvincia.value = String(item.provCod);
+    filterProvincia.dispatchEvent(new Event("change"));
+    filterComune.value = String(item.value);
+    filterComune.dispatchEvent(new Event("change"));
+  }
+  geoSearchInput.value = "";
+  geoSearchClear.style.display = "none";
+  geoSearchDD.classList.remove("open");
+}
+
+function updateChips() {
+  const active = [];
+  if (filterRegione.value) {
+    const r = geo.regioni.find((x) => x.cod === Number(filterRegione.value));
+    active.push({ label: r ? r.nome : filterRegione.value, clear: "regione" });
+  }
+  if (filterProvincia.value) {
+    const p = geo.province.find((x) => x.cod === Number(filterProvincia.value));
+    active.push({ label: p ? `${p.nome} (${p.sigla})` : filterProvincia.value, clear: "provincia" });
+  }
+  if (filterComune.value) {
+    active.push({ label: nomeComune(Number(filterComune.value)), clear: "comune" });
+  }
+
+  geoChips.style.display = active.length ? "flex" : "none";
+  geoFilterBadge.style.display = active.length ? "flex" : "none";
+  geoFilterBadge.textContent = active.length;
+  geoFilterBtn.classList.toggle("active", active.length > 0);
+
+  let html = active
+    .map((f) => `<span class="geo-chip">${esc(f.label)}<button class="geo-chip-close" data-clear="${esc(f.clear)}">✕</button></span>`)
+    .join("");
+  if (active.length > 1) {
+    html += `<button class="geo-chip geo-chip-resetall" id="geoChipsResetAll">✕ tutti</button>`;
+  }
+  geoChips.innerHTML = html;
+
+  geoChips.querySelectorAll(".geo-chip-close").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const c = btn.dataset.clear;
+      if (c === "regione") { filterRegione.value = ""; filterRegione.dispatchEvent(new Event("change")); }
+      if (c === "provincia") { filterProvincia.value = ""; filterProvincia.dispatchEvent(new Event("change")); }
+      if (c === "comune") { filterComune.value = ""; filterComune.dispatchEvent(new Event("change")); }
+    });
+  });
+  const ra = document.getElementById("geoChipsResetAll");
+  if (ra) ra.addEventListener("click", () => {
+    filterRegione.value = "";
+    filterRegione.dispatchEvent(new Event("change"));
+  });
+}
+
+geoSearchInput.addEventListener("input", () => {
+  geoSearchClear.style.display = geoSearchInput.value ? "" : "none";
+  renderGeoDD(geoSearchInput.value);
+});
+geoSearchClear.addEventListener("click", () => {
+  geoSearchInput.value = "";
+  geoSearchClear.style.display = "none";
+  geoSearchDD.classList.remove("open");
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#geoSearchbar")) geoSearchDD.classList.remove("open");
+});
+
+function closeGeoFilterModal() {
+  geoFilterModal.classList.remove("open");
+  geoFilterOverlay.classList.remove("open");
+}
+geoFilterBtn.addEventListener("click", () => {
+  geoFilterModal.classList.add("open");
+  geoFilterOverlay.classList.add("open");
+});
+geoModalClose.addEventListener("click", closeGeoFilterModal);
+geoFilterOverlay.addEventListener("click", closeGeoFilterModal);
+geoModalReset.addEventListener("click", () => {
+  filterRegione.value = "";
+  filterRegione.dispatchEvent(new Event("change"));
+  closeGeoFilterModal();
+});
+geoModalApply.addEventListener("click", closeGeoFilterModal);
 
 function comuniInRegione(codReg) {
   return Object.entries(geo.comuni).filter(([, g]) => g[0] === codReg).map(([id]) => Number(id));
@@ -505,6 +678,7 @@ function syncFiltersToComune(proCom) {
     populateComuni(codProv);
   }
   filterComune.value = String(proCom);
+  updateChips();
 }
 
 function point(id) {

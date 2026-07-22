@@ -1,5 +1,7 @@
 
 
+
+
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -50,12 +52,57 @@
   <div class="legend-row legend-static"><i class="swatch dot" style="background:#3d7fff"></i> Comune selezionato</div>
 </div>
 <button id="panelToggle" title="Apri/chiudi pannello" aria-label="Apri/chiudi pannello">◀</button>
-<aside id="panel">
-  <div id="geoFilters">
+
+<!-- ── Barra di ricerca intelligente ── -->
+<div id="geoSearchArea">
+  <div id="geoChips"></div>
+  <div id="geoSearchbar">
+    <span class="geo-si">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+        <path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+      </svg>
+    </span>
+    <input type="text" id="geoSearchInput"
+           placeholder="Cerca regione, provincia, comune…"
+           autocomplete="off">
+    <button id="geoSearchClear" style="display:none">&#x2715;</button>
+    <div class="geo-sep"></div>
+    <button id="geoFilterBtn" title="Filtri">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
+        <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/>
+      </svg>
+      <span id="geoFilterBadge" style="display:none"></span>
+    </button>
+    <div id="geoSearchDD"></div>
+  </div>
+</div>
+
+<!-- ── Modale filtri geografici ── -->
+<div id="geoFilterOverlay"></div>
+<div id="geoFilterModal">
+  <div class="gfm-header">
+    <h3>Filtri geografici</h3>
+    <button id="geoModalClose">&#x2715;</button>
+  </div>
+  <div class="gfm-group">
+    <label>Regione</label>
     <select id="filterRegione"><option value="">Tutte le regioni</option></select>
+  </div>
+  <div class="gfm-group">
+    <label>Provincia</label>
     <select id="filterProvincia" disabled><option value="">Tutte le province</option></select>
+  </div>
+  <div class="gfm-group">
+    <label>Comune</label>
     <select id="filterComune" disabled><option value="">Seleziona comune</option></select>
   </div>
+  <div class="gfm-footer">
+    <button id="geoModalReset">Ripristina</button>
+    <button id="geoModalApply">Applica</button>
+  </div>
+</div>
+
+<aside id="panel">
   <div id="allToggle">
     <label><input type="checkbox" id="showAllFlows" checked /> Mostra tutti i collegamenti</label>
     <label><input type="checkbox" id="showNodes" checked /> Mostra punti sui comuni</label>
