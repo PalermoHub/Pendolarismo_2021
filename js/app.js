@@ -549,10 +549,36 @@ function updateFlowView() {
   renderAllFlows();
   document.getElementById("panelBody").innerHTML = `
     ${hint}
+    ${nationalStatsHtml()}
     <h3>Saldo pendolari per regione (entrata − uscita)</h3>
     <p class="hint">Positivo = regione attrattiva (più occupati in entrata); negativo = regione che esporta forza lavoro.</p>
     ${divergingHtml(saldoPerRegione(), nomeRegione)}
   `;
+}
+
+// Stesse card statTiles/numRow del pannello comune/area, aggregate su tutta Italia.
+function nationalStatsHtml() {
+  let self = 0, out = 0, inn = 0;
+  for (const t of flowIndex.totals.values()) {
+    self += t.self;
+    out += t.out;
+    inn += t.in;
+  }
+  const totResidenti = self + out;
+  const totPostiLavoro = self + inn;
+  const saldo = inn - out;
+  return statBlockHtml(
+    [
+      { val: pct(self, totResidenti), label: "Vive e lavora nello stesso comune" },
+      { val: pct(out, totResidenti), label: "Pendola verso un altro comune" },
+      { val: pct(inn, totPostiLavoro), label: "Posti coperti da pendolari" },
+    ],
+    [
+      { val: fmt(totResidenti), label: "Popolazione attiva" },
+      { val: fmt(totPostiLavoro), label: "Posti di lavoro" },
+      { val: `${saldo >= 0 ? "+" : ""}${fmt(saldo)}`, label: "Saldo netto", cls: saldo >= 0 ? "pos" : "neg" },
+    ]
+  );
 }
 
 // Righe { id, saldo } → barra divergente (blu = entrata netta, arancio = uscita netta).
