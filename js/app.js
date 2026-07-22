@@ -705,13 +705,25 @@ function renderScopePanel(ids, title, scopeType) {
       .sort((a, b) => b.saldo - a.saldo);
 
   const altre = scopeType === "regione" ? "altre regioni" : "altre province";
+  const totResidentiArea = self + internal + externalOut;
+  const totPostiLavoroArea = self + internal + externalIn;
+  const saldoArea = externalIn - externalOut;
+  const statsHtml = statBlockHtml(
+    [
+      { val: pct(self + internal, totResidentiArea), label: "Vive e lavora nell'area" },
+      { val: pct(externalOut, totResidentiArea), label: `Esce verso ${altre}` },
+      { val: pct(externalIn, totPostiLavoroArea), label: "Posti coperti da fuori area" },
+    ],
+    [
+      { val: fmt(totResidentiArea), label: "Popolazione attiva" },
+      { val: fmt(totPostiLavoroArea), label: "Posti di lavoro" },
+      { val: `${saldoArea >= 0 ? "+" : ""}${fmt(saldoArea)}`, label: "Saldo netto", cls: saldoArea >= 0 ? "pos" : "neg" },
+    ]
+  );
   document.getElementById("panelBody").innerHTML = `
     <h2>${esc(title)}</h2>
     <p>Comuni inclusi: ${fmt(idSet.size)}</p>
-    <p>Residenti che lavorano nello stesso comune: ${fmt(self)}</p>
-    <p>Spostamenti interni all'area (tra comuni dell'area): ${fmt(internal)}</p>
-    <p>Pendolari in uscita verso ${altre}: ${fmt(externalOut)}</p>
-    <p>Pendolari in entrata da ${altre}: ${fmt(externalIn)}</p>
+    ${statsHtml}
     <h3>Saldo pendolari (entrata − uscita verso ${altre})</h3>
     <p class="hint">Positivo = polo lavoro (attrae); negativo = polo residenziale (esporta forza lavoro).</p>
     ${divergingHtml(saldoRanking(), nomeComune)}
@@ -1038,9 +1050,34 @@ function pct(n, total) {
   return total > 0 ? `${((n / total) * 100).toFixed(1)}%` : "0%";
 }
 
+// Riga di 3 tile (quote %) + riga di 3 numeri chiave: stesso blocco per comune e per scope area.
+function statBlockHtml(tiles, nums) {
+  const tilesHtml = tiles
+    .map((t) => `<div class="statTile"><div class="val">${t.val}</div><div class="lbl">${esc(t.label)}</div></div>`)
+    .join("");
+  const numsHtml = nums
+    .map((n) => `<div class="numCell"><div class="val${n.cls ? " " + n.cls : ""}">${n.val}</div><div class="lbl">${esc(n.label)}</div></div>`)
+    .join("");
+  return `<div class="statTiles">${tilesHtml}</div><div class="numRow">${numsHtml}</div>`;
+}
+
 function renderPanel(proCom, comuneName) {
   const totals = flowIndex.totals.get(proCom) ?? { out: 0, in: 0, self: 0 };
   const totResidenti = totals.out + totals.self;
+  const totPostiLavoro = totals.self + totals.in;
+  const saldo = totals.in - totals.out;
+  const statsHtml = statBlockHtml(
+    [
+      { val: pct(totals.self, totResidenti), label: "Vive e lavora qui" },
+      { val: pct(totals.out, totResidenti), label: "Lavora altrove" },
+      { val: pct(totals.in, totPostiLavoro), label: "Posti coperti da pendolari" },
+    ],
+    [
+      { val: fmt(totResidenti), label: "Popolazione attiva" },
+      { val: fmt(totPostiLavoro), label: "Posti di lavoro" },
+      { val: `${saldo >= 0 ? "+" : ""}${fmt(saldo)}`, label: "Saldo netto", cls: saldo >= 0 ? "pos" : "neg" },
+    ]
+  );
 
   const topOut = topFlows(flowIndex.byOrigin.get(proCom) ?? [], { totalForShare: totals.out || 1 });
   const topIn = topFlows(flowIndex.byDest.get(proCom) ?? [], { totalForShare: totals.in || 1 });
@@ -1058,9 +1095,7 @@ function renderPanel(proCom, comuneName) {
 
   document.getElementById("panelBody").innerHTML = `
     <h2>${esc(comuneName)}</h2>
-    <p>Residenti che lavorano nel comune: ${fmt(totals.self)} (${pct(totals.self, totResidenti)})</p>
-    <p>Usciti verso altri comuni: ${fmt(totals.out)}</p>
-    <p>Entrati da altri comuni: ${fmt(totals.in)}</p>
+    ${statsHtml}
     <p class="hint">Mostrati i primi 25 collegamenti (quota &ge; 1%). Attiva "Mostra tutti i collegamenti del comune" per vederli tutti sulla mappa.</p>
     <h3>Top destinazioni (uscita)</h3>
     ${listHtml(topOut, totals.out, "out")}
@@ -1112,11 +1147,12 @@ map.on("load", () => {
     hoverTooltip.style.top = `${e.point.y}px`;
     hoverTooltip.style.display = "block";
     const proCom = f.properties.pro_com;
-    const hoverArcsEnabled = selectedProCom === null && !showAllFlows && showNodes;
-    const nextHovered = hoverArcsEnabled ? proCom : null;
+    const nextHovered = hoverArcsAllowed() ? proCom : null;
     if (nextHovered !== hoveredProCom) {
       hoveredProCom = nextHovered;
       applyLayers();
+      if (hoveredProCom !== null) renderPanel(hoveredProCom, f.properties.comune);
+      else updateFlowView();
     }
   });
   map.on("mouseleave", "comuni-fill", () => {
@@ -1125,6 +1161,7 @@ map.on("load", () => {
     if (hoveredProCom !== null) {
       hoveredProCom = null;
       applyLayers();
+      updateFlowView();
     }
   });
   map.on("click", "comuni-fill", (e) => {

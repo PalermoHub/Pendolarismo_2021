@@ -44,6 +44,24 @@ html, body { height: 100%; font-family: 'Titillium Web', system-ui, sans-serif; 
 .divbar i.pos { background: #3d7fff; }
 .divbar i.neg { background: #ff4400; }
 
+.statTiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0 8px; }
+.statTile {
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 8px; padding: 10px 4px 8px; text-align: center;
+}
+.statTile .val { font-size: 18px; font-weight: 700; color: #ff9900; line-height: 1.1; }
+.statTile .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: .3px; color: #999; margin-top: 4px; line-height: 1.25; }
+
+.numRow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
+.numCell {
+  background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px; padding: 8px 4px; text-align: center;
+}
+.numCell .val { font-size: 14px; font-weight: 600; color: #e8e8e8; }
+.numCell .val.pos { color: #3d7fff; }
+.numCell .val.neg { color: #ff4400; }
+.numCell .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: .3px; color: #999; margin-top: 3px; line-height: 1.25; }
+
 #odsLogo {
   position: absolute; right: calc(var(--panel-offset) + 12px); bottom: 40px; z-index: 5;
   display: block; line-height: 0;
