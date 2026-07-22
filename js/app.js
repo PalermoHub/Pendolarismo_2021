@@ -35,35 +35,44 @@ loadData().catch((err) => {
   console.error(err);
 });
 
-function setupPanelToggle() {
-  const panel = document.getElementById("panel");
-  const toggle = document.getElementById("panelToggle");
-  const root = document.documentElement;
-  const COLLAPSED_OFFSET = 0;
+const BASE_PADDING = 30;
+const panelEl = document.getElementById("panel");
 
-  function syncOffset() {
-    const offset = panel.classList.contains("collapsed")
-      ? COLLAPSED_OFFSET
-      : panel.getBoundingClientRect().width;
-    root.style.setProperty("--panel-offset", `${offset}px`);
-  }
-
-  toggle.addEventListener("click", () => {
-    panel.classList.toggle("collapsed");
-    toggle.textContent = panel.classList.contains("collapsed") ? "▶" : "◀";
-    syncOffset();
-  });
-
-  if (window.matchMedia("(max-width: 768px)").matches) {
-    panel.classList.add("collapsed");
-    toggle.textContent = "▶";
-  }
-
-  new ResizeObserver(syncOffset).observe(panel);
-  syncOffset();
+if (window.matchMedia("(max-width: 768px)").matches) {
+  panelEl.classList.add("collapsed");
 }
 
-setupPanelToggle();
+function computeMapPadding() {
+  const offset = panelEl.classList.contains("collapsed")
+    ? 0
+    : panelEl.getBoundingClientRect().width;
+  return { top: BASE_PADDING, bottom: BASE_PADDING, left: BASE_PADDING, right: offset + BASE_PADDING };
+}
+
+function setupPanelToggle() {
+  const toggle = document.getElementById("panelToggle");
+  const root = document.documentElement;
+
+  function syncOffset(animate) {
+    const padding = computeMapPadding();
+    root.style.setProperty("--panel-offset", `${padding.right - BASE_PADDING}px`);
+    if (animate) {
+      map.easeTo({ padding, duration: 300 });
+    } else {
+      map.setPadding(padding);
+    }
+  }
+
+  toggle.textContent = panelEl.classList.contains("collapsed") ? "▶" : "◀";
+
+  toggle.addEventListener("click", () => {
+    panelEl.classList.toggle("collapsed");
+    toggle.textContent = panelEl.classList.contains("collapsed") ? "▶" : "◀";
+    syncOffset(true);
+  });
+
+  new ResizeObserver(() => syncOffset(false)).observe(panelEl);
+}
 
 const protocol = new pmtiles.Protocol();
 maplibregl.addProtocol("pmtiles", protocol.tile);
@@ -112,10 +121,10 @@ const map = new maplibregl.Map({
     ],
   },
   bounds: [
-    [6.6, 35.2],
-    [18.6, 47.2],
+    [5.6, 35.2],
+    [19.6, 47.2],
   ],
-  fitBoundsOptions: { padding: 20 },
+  fitBoundsOptions: { padding: computeMapPadding() },
   minZoom: 5,
   maxZoom: 12,
   hash: true,
@@ -123,10 +132,15 @@ const map = new maplibregl.Map({
     [4.5, 33.5],
     [20.5, 48.5],
   ],
+  attributionControl: false,
 });
+
+map.addControl(new maplibregl.AttributionControl({ compact: true }));
 
 const overlay = new deck.MapboxOverlay({ layers: [] });
 map.addControl(overlay);
+
+setupPanelToggle();
 
 let selectedProCom = null;
 let direction = "both";
