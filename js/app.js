@@ -34,6 +34,36 @@ loadData().catch((err) => {
   console.error(err);
 });
 
+function setupPanelToggle() {
+  const panel = document.getElementById("panel");
+  const toggle = document.getElementById("panelToggle");
+  const root = document.documentElement;
+  const COLLAPSED_OFFSET = 0;
+
+  function syncOffset() {
+    const offset = panel.classList.contains("collapsed")
+      ? COLLAPSED_OFFSET
+      : panel.getBoundingClientRect().width;
+    root.style.setProperty("--panel-offset", `${offset}px`);
+  }
+
+  toggle.addEventListener("click", () => {
+    panel.classList.toggle("collapsed");
+    toggle.textContent = panel.classList.contains("collapsed") ? "▶" : "◀";
+    syncOffset();
+  });
+
+  if (window.matchMedia("(max-width: 768px)").matches) {
+    panel.classList.add("collapsed");
+    toggle.textContent = "▶";
+  }
+
+  new ResizeObserver(syncOffset).observe(panel);
+  syncOffset();
+}
+
+setupPanelToggle();
+
 const protocol = new pmtiles.Protocol();
 maplibregl.addProtocol("pmtiles", protocol.tile);
 
@@ -138,18 +168,11 @@ document.getElementById("showAllFlows").addEventListener("change", (e) => {
   showAllFlows = e.target.checked;
   resetGeoFilters();
   selectedProCom = null;
-  map.setFilter("comuni-selected", ["==", ["get", "pro_com"], -1]);
-  if (showAllFlows) {
-    document.getElementById("panelBody").innerHTML = '<p id="panelEmpty">Clicca un comune per i dettagli.</p>';
-    renderAllFlows();
-  } else {
-    overlay.setProps({ layers: [] });
-    document.getElementById("panelBody").innerHTML = '<p id="panelEmpty">Clicca un comune sulla mappa.</p>';
-  }
+  updateFlowView();
 });
 
 function tryInitialRender() {
-  if (dataLoaded && mapLoaded && showAllFlows) renderAllFlows();
+  if (dataLoaded && mapLoaded) updateFlowView();
 }
 
 function resetGeoFilters() {
@@ -263,13 +286,60 @@ function updateFlowView() {
   }
   // nessun filtro geografico: torna alla vista globale/toggle
   map.setFilter("comuni-selected", ["==", ["get", "pro_com"], -1]);
+  const hint = showAllFlows ? "Clicca un comune per i dettagli." : "Clicca un comune sulla mappa.";
   if (showAllFlows) {
     renderAllFlows();
-    document.getElementById("panelBody").innerHTML = '<p id="panelEmpty">Clicca un comune per i dettagli.</p>';
   } else {
     overlay.setProps({ layers: [] });
-    document.getElementById("panelBody").innerHTML = '<p id="panelEmpty">Clicca un comune sulla mappa.</p>';
   }
+  document.getElementById("panelBody").innerHTML = `
+    <p id="panelEmpty">${hint}</p>
+    <h3>Saldo pendolari per regione (entrata − uscita)</h3>
+    <p class="hint">Positivo = regione attrattiva (più occupati in entrata); negativo = regione che esporta forza lavoro.</p>
+    ${divergingHtml(saldoPerRegione(), nomeRegione)}
+  `;
+}
+
+// Righe { id, saldo } → barra divergente (blu = entrata netta, arancio = uscita netta).
+function divergingHtml(list, labelFn) {
+  const maxAbs = Math.max(1, ...list.map((d) => Math.abs(d.saldo)));
+  return list
+    .map((d) => {
+      const width = ((Math.abs(d.saldo) / maxAbs) * 50).toFixed(1);
+      const cls = d.saldo >= 0 ? "pos" : "neg";
+      const side = d.saldo >= 0 ? `left:50%;width:${width}%` : `right:50%;width:${width}%`;
+      return `<div class="dest">
+        <div class="top"><span>${esc(labelFn(d.id))}</span><span class="pct">${d.saldo >= 0 ? "+" : ""}${fmt(d.saldo)}</span></div>
+        <div class="divbar"><i class="${cls}" style="${side}"></i></div>
+      </div>`;
+    })
+    .join("");
+}
+
+function nomeRegione(cod) {
+  return geo.regioni.find((r) => r.cod === cod)?.nome ?? String(cod);
+}
+
+// Saldo pendolari (entrata - uscita) aggregato per regione, su tutti i flussi interregionali.
+function saldoPerRegione() {
+  const acc = new Map();
+  const ensure = (id) => {
+    if (!acc.has(id)) acc.set(id, { out: 0, in: 0 });
+    return acc.get(id);
+  };
+  for (const [res, edges] of flowIndex.byOrigin) {
+    const rReg = geo.comuni[res]?.[0];
+    if (rReg == null) continue;
+    for (const { other, val } of edges) {
+      const oReg = geo.comuni[other]?.[0];
+      if (oReg == null || oReg === rReg) continue;
+      ensure(rReg).out += val;
+      ensure(oReg).in += val;
+    }
+  }
+  return [...acc.entries()]
+    .map(([id, v]) => ({ id, saldo: v.in - v.out }))
+    .sort((a, b) => b.saldo - a.saldo);
 }
 
 function renderScopePanel(ids, title, scopeType) {
@@ -308,6 +378,14 @@ function renderScopePanel(ids, title, scopeType) {
       })
       .join("");
 
+  const saldoRanking = () =>
+    [...perComune.entries()]
+      .map(([id, v]) => ({ id, saldo: v.in - v.out }))
+      .filter((d) => d.saldo !== 0)
+      .sort((a, b) => Math.abs(b.saldo) - Math.abs(a.saldo))
+      .slice(0, 10)
+      .sort((a, b) => b.saldo - a.saldo);
+
   const altre = scopeType === "regione" ? "altre regioni" : "altre province";
   document.getElementById("panelBody").innerHTML = `
     <h2>${esc(title)}</h2>
@@ -316,6 +394,9 @@ function renderScopePanel(ids, title, scopeType) {
     <p>Spostamenti interni all'area (tra comuni dell'area): ${fmt(internal)}</p>
     <p>Pendolari in uscita verso ${altre}: ${fmt(externalOut)}</p>
     <p>Pendolari in entrata da ${altre}: ${fmt(externalIn)}</p>
+    <h3>Saldo pendolari (entrata − uscita verso ${altre})</h3>
+    <p class="hint">Positivo = polo lavoro (attrae); negativo = dormitorio (esporta forza lavoro).</p>
+    ${divergingHtml(saldoRanking(), nomeComune)}
     <h3>Classifica comuni per uscita verso ${altre}</h3>
     ${rankingHtml(ranking("out"), externalOut, "out", "out")}
     <h3>Classifica comuni per entrata da ${altre}</h3>
