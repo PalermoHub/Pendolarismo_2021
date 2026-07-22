@@ -1281,6 +1281,7 @@ const METRIC_DEFS = {
   autocontenimento: {
     label: "Autocontenimento lavorativo",
     unit: "% occupati residenti che lavorano nello stesso comune",
+    description: "Quanto un comune trattiene i propri occupati: colori scuri = la maggior parte lavora sul posto (poca uscita), colori chiari = molti si spostano altrove per lavoro.",
     colors: AUTOCONT_COLORS,
     breaksKey: "autocontBreaks",
     featureStateKey: "acCls",
@@ -1289,6 +1290,7 @@ const METRIC_DEFS = {
   saldo: {
     label: "Saldo pendolarismo",
     unit: "Entrate − uscite (pendolari)",
+    description: "Se il comune attrae più pendolari di quanti ne perde: blu = polo lavoro (entrate > uscite), arancio = polo residenziale/dormitorio (uscite > entrate).",
     colors: SALDO_COLORS,
     breaksKey: "saldoBreaks",
     featureStateKey: "saldoCls",
@@ -1297,6 +1299,7 @@ const METRIC_DEFS = {
   intensita: {
     label: "Intensità pendolarismo",
     unit: "% pop. residente che esce per lavoro (Sardegna: nessun dato)",
+    description: "Quanto pendolarismo in uscita genera un comune rispetto alla sua popolazione: colori scuri = quota alta di residenti che si sposta fuori per lavoro.",
     colors: INTENSITA_COLORS,
     breaksKey: "intensitaBreaks",
     featureStateKey: "intCls",
@@ -1527,6 +1530,10 @@ function renderCoroRanking(metric) {
   });
 }
 
+function renderCoroMetricDesc(metric) {
+  document.getElementById("coroMetricDesc").textContent = METRIC_DEFS[metric].description;
+}
+
 function setActiveMetric(metric) {
   activeMetric = metric;
   resetCoroClassFilters();
@@ -1535,6 +1542,7 @@ function setActiveMetric(metric) {
   });
   applyCoroLayer(metric);
   renderCoroLegend(metric);
+  renderCoroMetricDesc(metric);
   renderCoroDonut(metric);
   renderCoroRanking(metric);
 }
@@ -1551,6 +1559,7 @@ function setActivePanelTab(tab) {
   if (tab === "coro") {
     setBaseLayers([]);
     applyCoroFeatureState();
+    renderCoroMetricDesc(activeMetric);
     if (coroData) {
       applyCoroLayer(activeMetric);
       renderCoroLegend(activeMetric);
