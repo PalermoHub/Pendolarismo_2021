@@ -20,8 +20,13 @@ html, body { height: 100%; font-family: 'Titillium Web', system-ui, sans-serif; 
   box-shadow: -2px 0 8px rgba(0,0,0,.5);
   transition: right .3s var(--ease-pan);
 }
+.mobile-only, .mobile-only-sep { display: none; }
 @media (max-width: 768px) {
   #panel { width: min(350px, 88vw); }
+  /* Su mobile la linguetta laterale è sostituita dal pulsante "Pannello" in toolbar. */
+  #panelToggle { display: none; }
+  .mobile-only { display: flex; }
+  .mobile-only-sep { display: block; }
 }
 #panelBody h2 { font-size: 15px; margin-bottom: 6px; color: #f0f0f0; }
 #panelBody h3 { font-size: 11px; text-transform: uppercase; color: #999; margin: 10px 0 4px; }

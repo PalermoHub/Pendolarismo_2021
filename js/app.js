@@ -70,6 +70,10 @@ const panelEl = document.getElementById("panel");
 
 if (window.matchMedia("(max-width: 768px)").matches) {
   panelEl.classList.add("collapsed");
+  // Set subito, senza aspettare il ResizeObserver: altrimenti --panel-offset
+  // resta al default 350px (da :root) e su schermi stretti il tab #panelToggle
+  // (right: var(--panel-offset)) nasce con coordinate fuori schermo.
+  document.documentElement.style.setProperty("--panel-offset", "0px");
 }
 
 function computeMapPadding() {
@@ -81,6 +85,7 @@ function computeMapPadding() {
 
 function setupPanelToggle() {
   const toggle = document.getElementById("panelToggle");
+  const mobileBtn = document.getElementById("btnPanelToggleMobile");
   const root = document.documentElement;
 
   function syncOffset(animate) {
@@ -93,13 +98,21 @@ function setupPanelToggle() {
     }
   }
 
-  toggle.textContent = panelEl.classList.contains("collapsed") ? "▶" : "◀";
+  function syncButtons() {
+    const collapsed = panelEl.classList.contains("collapsed");
+    toggle.textContent = collapsed ? "▶" : "◀";
+    mobileBtn.classList.toggle("active", !collapsed);
+  }
 
-  toggle.addEventListener("click", () => {
+  function togglePanel() {
     panelEl.classList.toggle("collapsed");
-    toggle.textContent = panelEl.classList.contains("collapsed") ? "▶" : "◀";
+    syncButtons();
     syncOffset(true);
-  });
+  }
+
+  syncButtons();
+  toggle.addEventListener("click", togglePanel);
+  mobileBtn.addEventListener("click", togglePanel);
 
   new ResizeObserver(() => syncOffset(false)).observe(panelEl);
 }
