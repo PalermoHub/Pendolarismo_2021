@@ -15,6 +15,8 @@ html, body { height: 100%; font-family: system-ui, sans-serif; }
 #panelBody h3 { font-size: 11px; text-transform: uppercase; color: #666; margin: 10px 0 4px; }
 #panelBody p { font-size: 12px; margin: 2px 0; }
 #panelBody p.hint { font-size: 11px; color: #888; font-style: italic; margin: 6px 0; }
+#panelNote { font-size: 10.5px; color: #888; font-style: italic; margin-top: 10px; padding-top: 8px; border-top: 1px solid #ddd; }
+#panelNote a { color: #ff4400; }
 .dest { font-size: 12px; padding: 3px 0; }
 .dest .top { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 2px; }
 .dest .pct { color: #666; flex: none; }
