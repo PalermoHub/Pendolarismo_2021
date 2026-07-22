@@ -148,13 +148,38 @@ let showAllFlows = true;
 let showNodes = true;
 let showAllComuneLinks = false;
 
-document.getElementById("showAllComuneLinks").addEventListener("change", (e) => {
-  showAllComuneLinks = e.target.checked;
+document.getElementById("btnComuneLinks").addEventListener("click", (e) => {
+  showAllComuneLinks = !showAllComuneLinks;
+  e.currentTarget.classList.toggle("active", showAllComuneLinks);
   if (selectedProCom !== null) renderArcs(selectedProCom);
 });
 
-document.getElementById("showNodes").addEventListener("change", (e) => {
-  showNodes = e.target.checked;
+const ITALY_BOUNDS = [
+  [5.6, 35.2],
+  [19.6, 47.2],
+];
+
+document.getElementById("btnHome").addEventListener("click", () => {
+  map.fitBounds(ITALY_BOUNDS, { padding: computeMapPadding(), duration: 600 });
+});
+
+const fsIconEnter = document.getElementById("fsIconEnter");
+const fsIconExit = document.getElementById("fsIconExit");
+
+document.getElementById("btnFullscreen").addEventListener("click", () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen();
+});
+
+document.addEventListener("fullscreenchange", () => {
+  const active = !!document.fullscreenElement;
+  fsIconEnter.style.display = active ? "none" : "";
+  fsIconExit.style.display = active ? "" : "none";
+});
+
+document.getElementById("btnShowNodes").addEventListener("click", (e) => {
+  showNodes = !showNodes;
+  e.currentTarget.classList.toggle("active", showNodes);
   updateFlowView();
 });
 
@@ -172,15 +197,17 @@ document.querySelectorAll("#legend .legend-row[data-kind]").forEach((row) => {
   });
 });
 
-document.querySelectorAll('#directionToggle input[name="dir"]').forEach((input) => {
-  input.addEventListener("change", (e) => {
-    direction = e.target.value;
+document.querySelectorAll(".dirBtn").forEach((btn) => {
+  btn.addEventListener("click", (e) => {
+    direction = e.currentTarget.dataset.dir;
+    document.querySelectorAll(".dirBtn").forEach((b) => b.classList.toggle("active", b === e.currentTarget));
     if (selectedProCom !== null) renderArcs(selectedProCom);
   });
 });
 
-document.getElementById("showAllFlows").addEventListener("change", (e) => {
-  showAllFlows = e.target.checked;
+document.getElementById("btnShowAllFlows").addEventListener("click", (e) => {
+  showAllFlows = !showAllFlows;
+  e.currentTarget.classList.toggle("active", showAllFlows);
   resetGeoFilters();
   selectedProCom = null;
   updateFlowView();
