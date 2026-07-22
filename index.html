@@ -147,6 +147,7 @@
 <aside id="panel">
   <div class="panel-tabbar">
     <button class="panel-tab active" id="panelTabFlussi" data-ptab="flussi">Flussi</button>
+    <button class="panel-tab" id="panelTabBivariate" data-ptab="bivariate">Bivariate</button>
     <button class="panel-tab" id="panelTabCoro" data-ptab="coro">Coroplettiche</button>
   </div>
 
@@ -176,6 +177,23 @@
     <p id="coroMetricDesc" class="hint"></p>
     <div id="coroDonut"></div>
     <div id="coroRanking"></div>
+  </div>
+
+  <div class="panel-view" id="panel-view-bivariate">
+    <p class="hint">Mappe bivariate per comune: incrocia due indicatori in una griglia 3×3 (tercili). Passa il mouse su un comune per entrambi i valori.</p>
+    <div id="coroBivBtns" class="coro-biv-btns">
+      <div class="layer-btn active" data-metric="saldo_densita">
+        <div class="layer-swatch" style="background:linear-gradient(135deg,#5ac8c8,#be64ac)"></div>
+        Saldo × Densità popolazione
+      </div>
+      <div class="layer-btn" data-metric="autocont_distanza">
+        <div class="layer-swatch" style="background:linear-gradient(135deg,#e8e8e8,#3b4994)"></div>
+        Autocontenimento × Distanza capoluogo
+      </div>
+    </div>
+    <p id="bivMetricDesc" class="hint"></p>
+    <div id="bivDonut"></div>
+    <div id="bivRanking"></div>
   </div>
 </aside>
 <a id="odsLogo" href="https://opendatasicilia.it/" target="_blank" rel="noopener" title="Open Data Sicilia">

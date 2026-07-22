@@ -1,5 +1,5 @@
 import { buildIndex, topFlows } from "./flow-index.js";
-import { computeMetrics, quantileBreaks, classify, classCounts, topBottom, donutSegments } from "./coro-index.js";
+import { computeMetrics, quantileBreaks, classify, classCounts, topBottom, donutSegments, percentileRanks } from "./coro-index.js";
 
 let flowIndex = null;
 let centroidi = null;
@@ -8,32 +8,29 @@ let dataLoaded = false;
 let mapLoaded = false;
 
 let popRes = null;
-let coroData = null; // { metrics: Map<id,{autocontenimento,saldo,intensita}>, autocontBreaks, saldoBreaks, intensitaBreaks }
+let coroData = null; // { metrics: Map<id,{autocontenimento,saldo,intensita,densita,distanzaCapoluogo}>, ...Breaks (5 classi), ...Breaks3 (tercili), ...Ranks (percentile) }
+
+function fetchJson(path) {
+  return fetch(path).then((r) => {
+    if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
+    return r.json();
+  });
+}
 
 async function loadData() {
-  const [flows, centroidiData, geoData, popResData] = await Promise.all([
-    fetch("data/flows.json").then((r) => {
-      if (!r.ok) throw new Error(`flows.json: HTTP ${r.status}`);
-      return r.json();
-    }),
-    fetch("data/centroidi.json").then((r) => {
-      if (!r.ok) throw new Error(`centroidi.json: HTTP ${r.status}`);
-      return r.json();
-    }),
-    fetch("data/geo.json").then((r) => {
-      if (!r.ok) throw new Error(`geo.json: HTTP ${r.status}`);
-      return r.json();
-    }),
-    fetch("data/pop_res_2021.json").then((r) => {
-      if (!r.ok) throw new Error(`pop_res_2021.json: HTTP ${r.status}`);
-      return r.json();
-    }),
+  const [flows, centroidiData, geoData, popResData, areaKmqData, distCapoluogoData] = await Promise.all([
+    fetchJson("data/flows.json"),
+    fetchJson("data/centroidi.json"),
+    fetchJson("data/geo.json"),
+    fetchJson("data/pop_res_2021.json"),
+    fetchJson("data/area_kmq.json"),
+    fetchJson("data/dist_capoluogo.json"),
   ]);
   flowIndex = buildIndex(flows);
   centroidi = centroidiData;
   geo = geoData;
   popRes = popResData;
-  coroData = buildCoroData(flowIndex.totals, popRes);
+  coroData = buildCoroData(flowIndex.totals, popRes, areaKmqData, distCapoluogoData);
   dataLoaded = true;
   initGeoFilters();
   buildGeoSuggestions();
@@ -42,14 +39,24 @@ async function loadData() {
   applyCoroFeatureState();
 }
 
-function buildCoroData(totals, pop) {
-  const metrics = computeMetrics(totals, pop);
+function buildCoroData(totals, pop, areaKmq, distCapoluogo) {
+  const metrics = computeMetrics(totals, pop, areaKmq, distCapoluogo);
   const finite = (key) => [...metrics.values()].map((m) => m[key]).filter((v) => v !== null);
   return {
     metrics,
     autocontBreaks: quantileBreaks(finite("autocontenimento")),
     saldoBreaks: quantileBreaks(finite("saldo")),
     intensitaBreaks: quantileBreaks(finite("intensita")),
+    // Tercili (2 breakpoint -> 3 classi basso/medio/alto) per gli assi delle mappe bivariate.
+    saldoBreaks3: quantileBreaks(finite("saldo"), 3),
+    densitaBreaks3: quantileBreaks(finite("densita"), 3),
+    autocontBreaks3: quantileBreaks(finite("autocontenimento"), 3),
+    distCapBreaks3: quantileBreaks(finite("distanzaCapoluogo"), 3),
+    // Ranghi percentile per punteggiare l'estremità di un comune sui due assi bivariati.
+    saldoRanks: percentileRanks(metrics, "saldo"),
+    densitaRanks: percentileRanks(metrics, "densita"),
+    autocontRanks: percentileRanks(metrics, "autocontenimento"),
+    distCapRanks: percentileRanks(metrics, "distanzaCapoluogo"),
   };
 }
 
@@ -1215,7 +1222,7 @@ map.on("load", () => {
   });
   map.on("click", "comuni-fill", (e) => {
     const f = e.features[0];
-    if (activePanelTab === "coro") {
+    if (activePanelTab === "coro" || activePanelTab === "bivariate") {
       showCoroPopup(f.properties.pro_com, f.properties.comune, e.lngLat);
     } else {
       onComuneClick(f.properties.pro_com, f.properties.comune, e.lngLat);
@@ -1270,6 +1277,12 @@ map.on("load", () => {
 // ── Tab Coroplettiche ────────────────────────────────────────────────────
 let activePanelTab = "flussi";
 let activeMetric = "autocontenimento";
+let activeBivMetric = "saldo_densita";
+
+// Metrica in uso per il layer mappa/legenda/tooltip: dipende dal tab pannello attivo.
+function currentCoroMetric() {
+  return activePanelTab === "bivariate" ? activeBivMetric : activeMetric;
+}
 let coroFeatureStateApplied = false;
 
 const AUTOCONT_COLORS = ["#fef0d9", "#fdcc8a", "#fc8d59", "#e34a33", "#b30000"];
@@ -1307,8 +1320,78 @@ const METRIC_DEFS = {
   },
 };
 
-// Assegna a ogni comune la classe (0..4) o -1 (nessun dato) per ciascuna delle
-// 3 metriche, come proprietà di MapLibre feature-state sul layer comuni-fill.
+// Palette bivariata 3x3 classica (Joshua Stevens): grigio-teal per l'asse X,
+// magenta-blu per l'asse Y. colors[xCls*3 + yCls], xCls/yCls in 0..2 (tercili).
+const BIVAR_COLORS = [
+  "#e8e8e8", "#dfb0d6", "#be64ac", // x basso: y basso, medio, alto
+  "#ace4e4", "#a5add3", "#8c62aa", // x medio
+  "#5ac8c8", "#5698b9", "#3b4994", // x alto
+];
+const TERCILE_LABELS = ["basso", "medio", "alto"];
+const TERCILE_LABELS_UP = ["BASSA", "MEDIA", "ALTA"];
+
+const BIVAR_DEFS = {
+  saldo_densita: {
+    label: "Saldo × Densità popolazione",
+    metricX: "saldo",
+    metricY: "densita",
+    breaksXKey: "saldoBreaks3",
+    breaksYKey: "densitaBreaks3",
+    ranksXKey: "saldoRanks",
+    ranksYKey: "densitaRanks",
+    labelX: "Saldo pendolarismo",
+    labelY: "Densità popolazione",
+    formatX: (v) => `${v >= 0 ? "+" : ""}${fmt(v)}`,
+    formatY: (v) => `${v.toFixed(0)} ab/km²`,
+    colors: BIVAR_COLORS,
+    featureStateKey: "svCls",
+    description: "Incrocia il saldo pendolari (entrate − uscite) con la densità abitativa. Angolo rosa in alto: saldo negativo + densità alta = comuni \"dormitorio densi\" (satelliti di aree metropolitane). Angolo verde acqua in basso: saldo positivo + densità bassa = \"poli attrattori radi\" (piccoli centri industriali/produttivi che polarizzano il lavoro di un territorio esteso).",
+    corners: [
+      { xCls: 0, yCls: 2, title: "Dormitorio densi", hint: "saldo basso + densità alta" },
+      { xCls: 2, yCls: 0, title: "Poli attrattori radi", hint: "saldo alto + densità bassa" },
+    ],
+  },
+  autocont_distanza: {
+    label: "Autocontenimento × Distanza dal capoluogo",
+    metricX: "autocontenimento",
+    metricY: "distanzaCapoluogo",
+    breaksXKey: "autocontBreaks3",
+    breaksYKey: "distCapBreaks3",
+    ranksXKey: "autocontRanks",
+    ranksYKey: "distCapRanks",
+    labelX: "Autocontenimento lavorativo",
+    labelY: "Distanza dal capoluogo di provincia",
+    formatX: (v) => `${v.toFixed(1)}%`,
+    formatY: (v) => `${v.toFixed(0)} km`,
+    colors: BIVAR_COLORS,
+    featureStateKey: "adCls",
+    description: "Incrocia l'autocontenimento lavorativo con la distanza dal capoluogo di provincia: mostra l'effetto gravitazionale del capoluogo sui comuni limitrofi. Angolo grigio chiaro in basso a sinistra: vicini al capoluogo e poco autonomi (satelliti attratti). Angolo blu scuro in alto a destra: lontani e autonomi (poli locali indipendenti).",
+    corners: [
+      { xCls: 0, yCls: 0, title: "Satelliti del capoluogo", hint: "vicini + poco autonomi" },
+      { xCls: 2, yCls: 2, title: "Poli locali indipendenti", hint: "lontani + molto autonomi" },
+    ],
+  },
+};
+
+function getDef(metric) {
+  return METRIC_DEFS[metric] ?? BIVAR_DEFS[metric];
+}
+function isBivariate(metric) {
+  return metric in BIVAR_DEFS;
+}
+
+// Classe combinata 0..8 (xCls*3 + yCls) o -1 se uno dei due valori manca.
+function bivariateClass(def, m) {
+  const x = m[def.metricX];
+  const y = m[def.metricY];
+  if (x === null || y === null) return -1;
+  const xCls = classify(x, coroData[def.breaksXKey]);
+  const yCls = classify(y, coroData[def.breaksYKey]);
+  return xCls * 3 + yCls;
+}
+
+// Assegna a ogni comune la classe (0..4, o 0..8 per le bivariate) o -1 (nessun
+// dato) per ciascuna metrica/coppia, come feature-state sul layer comuni-fill.
 // Va rifatto solo una volta: cambiare metrica attiva aggiorna solo il paint.
 function applyCoroFeatureState() {
   if (coroFeatureStateApplied || !mapLoaded || !coroData) return;
@@ -1317,6 +1400,8 @@ function applyCoroFeatureState() {
       acCls: m.autocontenimento === null ? -1 : classify(m.autocontenimento, coroData.autocontBreaks),
       saldoCls: classify(m.saldo, coroData.saldoBreaks),
       intCls: m.intensita === null ? -1 : classify(m.intensita, coroData.intensitaBreaks),
+      svCls: bivariateClass(BIVAR_DEFS.saldo_densita, m),
+      adCls: bivariateClass(BIVAR_DEFS.autocont_distanza, m),
     };
     map.setFeatureState({ source: "comuni", sourceLayer: "comuni", id }, state);
   }
@@ -1324,7 +1409,7 @@ function applyCoroFeatureState() {
 }
 
 function coroPaintExpression(metric) {
-  const def = METRIC_DEFS[metric];
+  const def = getDef(metric);
   const expr = ["match", ["feature-state", def.featureStateKey]];
   def.colors.forEach((color, i) => expr.push(i, color));
   expr.push(NODATA_COLOR);
@@ -1347,7 +1432,7 @@ function coroClassVisible(key) {
 }
 
 function coroOpacityExpression(metric) {
-  const def = METRIC_DEFS[metric];
+  const def = getDef(metric);
   const expr = ["match", ["feature-state", def.featureStateKey]];
   def.colors.forEach((color, i) => expr.push(i, coroClassVisible(i) ? 0.78 : 0.06));
   expr.push(coroClassVisible("nodata") ? 0.78 : 0.06);
@@ -1399,8 +1484,44 @@ function coroLegendHtml(metric) {
   `;
 }
 
+// Griglia 3x3 cliccabile (stessa logica di filtro/isolamento classe della
+// legenda mono-metrica): righe = asse Y (dal basso in alto = valore crescente),
+// colonne = asse X (da sinistra a destra = valore crescente).
+function bivariateLegendHtml(metric) {
+  const def = BIVAR_DEFS[metric];
+  const nodataCount = [...coroData.metrics.values()].filter((m) => bivariateClass(def, m) === -1).length;
+  const colHeadsHtml = TERCILE_LABELS_UP.map((t) => `<div class="coro-biv-colhead">${t}</div>`).join("");
+  const rowsHtml = [2, 1, 0]
+    .map((yCls) => {
+      const cellsHtml = [0, 1, 2]
+        .map((xCls) => {
+          const cls = xCls * 3 + yCls;
+          const color = BIVAR_COLORS[cls];
+          return `<div class="coro-biv-cell${coroClassVisible(cls) ? "" : " off"}" data-cls="${cls}" style="background:${color}" title="${esc(def.labelX)}: ${TERCILE_LABELS[xCls]} · ${esc(def.labelY)}: ${TERCILE_LABELS[yCls]}"></div>`;
+        })
+        .join("");
+      return `<div class="coro-biv-rowhead">${TERCILE_LABELS_UP[yCls]}</div>${cellsHtml}`;
+    })
+    .join("");
+  return `
+    <div class="coro-leg-title">${esc(def.label)}</div>
+    <div class="coro-leg-hint">Click cella &rarr; filtra per classe</div>
+    <div class="coro-biv-wrap">
+      <div class="coro-biv-axis-y">${esc(def.labelY)} &uarr;</div>
+      <div class="coro-biv-grid">
+        <div class="coro-biv-corner"></div>${colHeadsHtml}
+        ${rowsHtml}
+      </div>
+    </div>
+    <div class="coro-biv-axis-x">${esc(def.labelX)} &rarr;</div>
+    <div class="coro-leg-nodata${coroClassVisible("nodata") ? "" : " off"}" data-cls="nodata" title="Nessun dato: clic per isolare"><i></i> Nessun dato (${fmt(nodataCount)} comuni)</div>
+  `;
+}
+
 function renderCoroLegend(metric) {
-  document.getElementById("coroMapLegend").innerHTML = coroLegendHtml(metric);
+  document.getElementById("coroMapLegend").innerHTML = isBivariate(metric)
+    ? bivariateLegendHtml(metric)
+    : coroLegendHtml(metric);
 }
 
 document.getElementById("coroMapLegend").addEventListener("click", (e) => {
@@ -1409,10 +1530,16 @@ document.getElementById("coroMapLegend").addEventListener("click", (e) => {
   const key = el.dataset.cls === "nodata" ? "nodata" : Number(el.dataset.cls);
   if (coroSelectedClasses.has(key)) coroSelectedClasses.delete(key);
   else coroSelectedClasses.add(key);
-  applyCoroLayer(activeMetric);
-  renderCoroLegend(activeMetric);
-  renderCoroDonut(activeMetric);
-  renderCoroRanking(activeMetric);
+  const metric = currentCoroMetric();
+  applyCoroLayer(metric);
+  renderCoroLegend(metric);
+  if (isBivariate(metric)) {
+    renderBivariateDonut(metric);
+    renderBivariateCorners(metric);
+  } else {
+    renderCoroDonut(metric);
+    renderCoroRanking(metric);
+  }
 });
 
 // Coordinate (x,y) di un punto a distanza `radius` dal centro (cx,cy), all'angolo dato.
@@ -1433,17 +1560,9 @@ function donutArcPath(cx, cy, outerR, innerR, start, sweep) {
 
 const DONUT_CLASS_LABELS = ["Classe 1 (bassa)", "Classe 2", "Classe 3", "Classe 4", "Classe 5 (alta)", "Nessun dato"];
 
-// Grafico a ciambella: quanti comuni ricadono in ciascuna delle 5 classi
-// (+ "nessun dato"), per vedere a colpo d'occhio se la distribuzione è
-// bilanciata (i quantili la rendono ~uguale per costruzione) o sbilanciata.
-function renderCoroDonut(metric) {
-  const def = METRIC_DEFS[metric];
-  const breaks = coroData[def.breaksKey];
-  // Le classi disattivate dalla legenda escono dal conteggio: donut interconnesso al filtro.
-  const counts = classCounts(coroData.metrics, metric, breaks).map((n, i) => (coroClassVisible(i) ? n : 0));
-  const nodataCount = coroClassVisible("nodata") ? [...coroData.metrics.values()].filter((m) => m[metric] === null).length : 0;
-  const allCounts = [...counts, nodataCount];
-  const allColors = [...def.colors, NODATA_COLOR];
+// Card donut generica: conteggi/colori/etichette allineati per indice, ultimo
+// elemento sempre "nessun dato". Riusata da mono-metrica e bivariate.
+function donutCardHtml(allCounts, allColors, allLabels) {
   const total = allCounts.reduce((a, b) => a + b, 0);
   const segments = donutSegments(allCounts);
   const R = 45, r = 28, cx = 65, cy = 65;
@@ -1459,7 +1578,7 @@ function renderCoroDonut(metric) {
       const barW = total > 0 ? Math.round((n / total) * 40) : 0;
       return `<div class="coro-donut-leg-row">
         <div class="coro-donut-dot" style="background:${allColors[i]}"></div>
-        <span class="coro-donut-leg-label">${esc(DONUT_CLASS_LABELS[i])}</span>
+        <span class="coro-donut-leg-label">${esc(allLabels[i])}</span>
         <div class="coro-donut-leg-bar-wrap"><div class="coro-donut-leg-bar" style="width:${barW}px;background:${allColors[i]}"></div></div>
         <span class="coro-donut-leg-count">${fmt(n)}</span>
         <span class="coro-donut-leg-pct">${pct}%</span>
@@ -1467,7 +1586,7 @@ function renderCoroDonut(metric) {
     })
     .join("");
 
-  document.getElementById("coroDonut").innerHTML = `
+  return `
     <div class="coro-donut-card">
       <div class="coro-donut-svg-wrap">
         <svg class="coro-donut-svg" viewBox="0 0 130 130">
@@ -1479,6 +1598,48 @@ function renderCoroDonut(metric) {
       <div class="coro-donut-legend">${legRowsHtml}</div>
     </div>
   `;
+}
+
+// Grafico a ciambella: quanti comuni ricadono in ciascuna delle 5 classi
+// (+ "nessun dato"), per vedere a colpo d'occhio se la distribuzione è
+// bilanciata (i quantili la rendono ~uguale per costruzione) o sbilanciata.
+function renderCoroDonut(metric) {
+  const def = METRIC_DEFS[metric];
+  const breaks = coroData[def.breaksKey];
+  // Le classi disattivate dalla legenda escono dal conteggio: donut interconnesso al filtro.
+  const counts = classCounts(coroData.metrics, metric, breaks).map((n, i) => (coroClassVisible(i) ? n : 0));
+  const nodataCount = coroClassVisible("nodata") ? [...coroData.metrics.values()].filter((m) => m[metric] === null).length : 0;
+  document.getElementById("coroDonut").innerHTML = donutCardHtml(
+    [...counts, nodataCount],
+    [...def.colors, NODATA_COLOR],
+    DONUT_CLASS_LABELS
+  );
+}
+
+// Donut bivariata: 9 classi (griglia 3x3) + "nessun dato".
+function renderBivariateDonut(metric) {
+  const def = BIVAR_DEFS[metric];
+  const counts = new Array(9).fill(0);
+  let nodataCount = 0;
+  for (const m of coroData.metrics.values()) {
+    const cls = bivariateClass(def, m);
+    if (cls === -1) nodataCount++;
+    else counts[cls]++;
+  }
+  const filteredCounts = counts.map((n, i) => (coroClassVisible(i) ? n : 0));
+  const finalNodata = coroClassVisible("nodata") ? nodataCount : 0;
+  const labels = [];
+  for (let xCls = 0; xCls < 3; xCls++) {
+    for (let yCls = 0; yCls < 3; yCls++) {
+      labels.push(`${def.labelX} ${TERCILE_LABELS[xCls]} · ${def.labelY} ${TERCILE_LABELS[yCls]}`);
+    }
+  }
+  labels.push("Nessun dato");
+  document.getElementById("bivDonut").innerHTML = donutCardHtml(
+    [...filteredCounts, finalNodata],
+    [...def.colors, NODATA_COLOR],
+    labels
+  );
 }
 
 // Righe cliccabili: click centra la mappa sul comune (stesso flyTo usato dalla
@@ -1499,6 +1660,65 @@ function coroRankRowsHtml(list, def) {
       </div>`;
     })
     .join("");
+}
+
+// Righe di un angolo bivariato: ordina i comuni della classe combinata per
+// "estremità" (quanto il comune è tipico dell'angolo, non solo dentro la classe),
+// usando i ranghi percentile sui due assi. Mostra entrambi i valori X e Y.
+function bivariateCornerRowsHtml(list, def) {
+  return list
+    .map((d, i) => `<div class="coro-rank-row" data-procom="${d.id}">
+        <div class="rank-top">
+          <span class="rank-idx">${i + 1}</span>
+          <span class="rank-name">${esc(nomeComune(d.id))}</span>
+        </div>
+        <div class="coro-biv-rank-vals">
+          <span>${esc(def.labelX)}: ${def.formatX(d.x)}</span>
+          <span>${esc(def.labelY)}: ${def.formatY(d.y)}</span>
+        </div>
+      </div>`)
+    .join("");
+}
+
+function renderBivariateCorners(metric) {
+  const def = BIVAR_DEFS[metric];
+  const xRanks = coroData[def.ranksXKey];
+  const yRanks = coroData[def.ranksYKey];
+
+  const cornerList = ({ xCls, yCls }) => {
+    const cls = xCls * 3 + yCls;
+    if (!coroClassVisible(cls)) return [];
+    const items = [];
+    for (const [id, m] of coroData.metrics) {
+      if (bivariateClass(def, m) !== cls) continue;
+      const xr = xRanks.get(id) ?? 0.5;
+      const yr = yRanks.get(id) ?? 0.5;
+      // Punteggio di "estremità" verso l'angolo: premia rango alto sul lato
+      // "alto" dell'angolo e rango basso sul lato "basso".
+      const score = (xCls === 2 ? xr : 1 - xr) + (yCls === 2 ? yr : 1 - yr);
+      items.push({ id, x: m[def.metricX], y: m[def.metricY], score });
+    }
+    return items.sort((a, b) => b.score - a.score).slice(0, 10);
+  };
+
+  document.getElementById("bivRanking").innerHTML = def.corners
+    .map(({ xCls, yCls, title, hint }) => `
+      <div class="coro-rank-section">
+        <h4>${esc(title)} <span class="hint">(${esc(hint)})</span></h4>
+        ${bivariateCornerRowsHtml(cornerList({ xCls, yCls }), def)}
+      </div>
+    `)
+    .join("");
+
+  document.querySelectorAll("#bivRanking .coro-rank-row").forEach((row) => {
+    row.addEventListener("click", () => {
+      const proCom = Number(row.dataset.procom);
+      const pos = point(proCom);
+      if (!pos) return;
+      map.flyTo({ center: pos, zoom: Math.max(map.getZoom(), 10) });
+      showCoroPopup(proCom, nomeComune(proCom), pos);
+    });
+  });
 }
 
 function renderCoroRanking(metric) {
@@ -1534,6 +1754,10 @@ function renderCoroMetricDesc(metric) {
   document.getElementById("coroMetricDesc").textContent = METRIC_DEFS[metric].description;
 }
 
+function renderBivMetricDesc(metric) {
+  document.getElementById("bivMetricDesc").textContent = BIVAR_DEFS[metric].description;
+}
+
 function setActiveMetric(metric) {
   activeMetric = metric;
   resetCoroClassFilters();
@@ -1547,14 +1771,29 @@ function setActiveMetric(metric) {
   renderCoroRanking(metric);
 }
 
+function setActiveBivMetric(metric) {
+  activeBivMetric = metric;
+  resetCoroClassFilters();
+  document.querySelectorAll("#coroBivBtns .layer-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.metric === metric);
+  });
+  applyCoroLayer(metric);
+  renderCoroLegend(metric);
+  renderBivMetricDesc(metric);
+  renderBivariateDonut(metric);
+  renderBivariateCorners(metric);
+}
+
 function setActivePanelTab(tab) {
   activePanelTab = tab;
   document.getElementById("panelTabFlussi").classList.toggle("active", tab === "flussi");
+  document.getElementById("panelTabBivariate").classList.toggle("active", tab === "bivariate");
   document.getElementById("panelTabCoro").classList.toggle("active", tab === "coro");
   document.getElementById("panel-view-flussi").classList.toggle("active", tab === "flussi");
+  document.getElementById("panel-view-bivariate").classList.toggle("active", tab === "bivariate");
   document.getElementById("panel-view-coro").classList.toggle("active", tab === "coro");
   document.getElementById("legend").style.display = tab === "flussi" ? "" : "none";
-  document.getElementById("coroMapLegend").style.display = tab === "coro" ? "" : "none";
+  document.getElementById("coroMapLegend").style.display = tab === "flussi" ? "none" : "";
   if (!mapLoaded) return; // il tab può essere cliccato prima che la mappa/i dati siano pronti
   if (tab === "coro") {
     setBaseLayers([]);
@@ -1566,6 +1805,16 @@ function setActivePanelTab(tab) {
       renderCoroDonut(activeMetric);
       renderCoroRanking(activeMetric);
     }
+  } else if (tab === "bivariate") {
+    setBaseLayers([]);
+    applyCoroFeatureState();
+    renderBivMetricDesc(activeBivMetric);
+    if (coroData) {
+      applyCoroLayer(activeBivMetric);
+      renderCoroLegend(activeBivMetric);
+      renderBivariateDonut(activeBivMetric);
+      renderBivariateCorners(activeBivMetric);
+    }
   } else {
     clearCoroLayer();
     if (dataLoaded) updateFlowView();
@@ -1573,20 +1822,34 @@ function setActivePanelTab(tab) {
 }
 
 document.getElementById("panelTabFlussi").addEventListener("click", () => setActivePanelTab("flussi"));
+document.getElementById("panelTabBivariate").addEventListener("click", () => setActivePanelTab("bivariate"));
 document.getElementById("panelTabCoro").addEventListener("click", () => setActivePanelTab("coro"));
 document.querySelectorAll("#coroLayerBtns .layer-btn").forEach((btn) => {
   btn.addEventListener("click", () => setActiveMetric(btn.dataset.metric));
 });
+document.querySelectorAll("#coroBivBtns .layer-btn").forEach((btn) => {
+  btn.addEventListener("click", () => setActiveBivMetric(btn.dataset.metric));
+});
 
 // Tooltip hover: nome comune + valore della metrica attiva quando il tab
 // Coroplettiche è aperto, altrimenti solo il nome (comportamento invariato).
+function coroValueHtml(m, metric) {
+  const def = getDef(metric);
+  if (isBivariate(metric)) {
+    const x = m ? m[def.metricX] : null;
+    const y = m ? m[def.metricY] : null;
+    if (x === null || y === null) return `${def.label}: nessun dato`;
+    return `${def.labelX}: ${def.formatX(x)} · ${def.labelY}: ${def.formatY(y)}`;
+  }
+  const val = m ? m[metric] : null;
+  return `${def.label}: ${val === null ? "nessun dato" : def.format(val)}`;
+}
+
 function updateHoverTooltip(point, proCom, comuneName) {
-  if (activePanelTab === "coro" && coroData) {
+  if ((activePanelTab === "coro" || activePanelTab === "bivariate") && coroData) {
     const m = coroData.metrics.get(proCom);
-    const def = METRIC_DEFS[activeMetric];
-    const val = m ? m[activeMetric] : null;
     hoverTooltip.classList.add("coro");
-    hoverTooltip.innerHTML = `${esc(comuneName)}<span class="coro-val">${def.label}: ${val === null ? "nessun dato" : def.format(val)}</span>`;
+    hoverTooltip.innerHTML = `${esc(comuneName)}<span class="coro-val">${coroValueHtml(m, currentCoroMetric())}</span>`;
   } else {
     hoverTooltip.classList.remove("coro");
     hoverTooltip.textContent = comuneName;
@@ -1598,10 +1861,8 @@ function updateHoverTooltip(point, proCom, comuneName) {
 
 function showCoroPopup(proCom, comuneName, lngLat) {
   const m = coroData.metrics.get(proCom);
-  const def = METRIC_DEFS[activeMetric];
-  const val = m ? m[activeMetric] : null;
   showPopup(lngLat, `
     <strong>${esc(comuneName)}</strong>
-    <p>${esc(def.label)}: ${val === null ? "nessun dato" : def.format(val)}</p>
+    <p>${coroValueHtml(m, currentCoroMetric())}</p>
   `);
 }

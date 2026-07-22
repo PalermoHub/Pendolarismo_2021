@@ -61,6 +61,31 @@ html, body { height: 100%; font-family: 'Titillium Web', system-ui, sans-serif; 
 .layer-btn.active { color: #fff; background: rgba(255,153,0,.18); border-color: #ff9900; }
 .layer-swatch { width: 26px; height: 8px; border-radius: 3px; flex-shrink: 0; }
 
+.coro-biv-btns { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 14px; }
+
+/* ── COROPLETTICHE BIVARIATE: legenda griglia 3x3 ───────────────────── */
+.coro-leg-hint { font-size: 9.5px; color: #999; margin-bottom: 10px; }
+.coro-biv-wrap { display: flex; gap: 6px; align-items: stretch; margin-bottom: 2px; }
+.coro-biv-axis-y {
+  writing-mode: vertical-rl; transform: rotate(180deg); text-align: center;
+  font-size: 9.5px; color: #999; flex-shrink: 0; white-space: nowrap;
+}
+.coro-biv-axis-x { font-size: 9.5px; color: #999; text-align: right; margin: 3px 0 8px; }
+.coro-biv-grid {
+  display: grid;
+  grid-template-columns: 28px repeat(3, 38px);
+  gap: 3px;
+}
+.coro-biv-corner { }
+.coro-biv-colhead { font-size: 8px; color: #999; text-align: center; align-self: end; padding-bottom: 2px; white-space: nowrap; }
+.coro-biv-rowhead {
+  display: flex; align-items: center; justify-content: flex-end;
+  font-size: 8px; color: #999; padding-right: 3px; text-align: right; white-space: nowrap;
+}
+.coro-biv-cell { aspect-ratio: 1; border-radius: 2px; cursor: pointer; transition: opacity .15s; }
+.coro-biv-cell.off { opacity: .25; }
+.coro-biv-rank-vals { display: flex; gap: 10px; font-size: 10.5px; color: #999; margin-left: 20px; }
+
 /* ── COROPLETTICHE: legenda ─────────────────────────────────────────── */
 #coroLegend { font-size: 11px; }
 .coro-leg-title { font-size: 11px; font-weight: 700; color: #f0f0f0; margin-bottom: 1px; }

@@ -2,7 +2,7 @@
 // popolazione residente 2021. Restituisce null per un comune quando la metrica
 // non è calcolabile (residenti=0 per autocontenimento; pop_res assente, es.
 // Sardegna, per intensità), mai 0: 0 e "nessun dato" hanno significati diversi.
-export function computeMetrics(totals, popRes) {
+export function computeMetrics(totals, popRes, areaKmq = null, distCapoluogo = null) {
   const result = new Map();
   for (const [id, t] of totals) {
     const residenti = t.self + t.out;
@@ -10,7 +10,16 @@ export function computeMetrics(totals, popRes) {
     const saldo = t.in - t.out;
     const pop = popRes[id] ?? popRes[String(id)];
     const intensita = pop > 0 ? (t.out / pop) * 100 : null;
-    result.set(id, { autocontenimento, saldo, intensita });
+    const metriche = { autocontenimento, saldo, intensita };
+    if (areaKmq) {
+      const area = areaKmq[id] ?? areaKmq[String(id)];
+      metriche.densita = pop > 0 && area > 0 ? pop / area : null;
+    }
+    if (distCapoluogo) {
+      const dist = distCapoluogo[id] ?? distCapoluogo[String(id)];
+      metriche.distanzaCapoluogo = dist ?? null;
+    }
+    result.set(id, metriche);
   }
   return result;
 }
@@ -45,6 +54,18 @@ export function classCounts(metrics, metricKey, breaks) {
     counts[classify(v, breaks)]++;
   }
   return counts;
+}
+
+// Rango percentile (0..1, 0=minimo, 1=massimo) di ogni id per la metrica data,
+// per punteggiare "quanto è estremo" un comune su un asse di una mappa bivariata.
+// I null (nessun dato) sono esclusi dalla mappa risultante.
+export function percentileRanks(metrics, metricKey) {
+  const entries = [...metrics.entries()].filter(([, m]) => m[metricKey] !== null);
+  const sorted = [...entries].sort((a, b) => a[1][metricKey] - b[1][metricKey]);
+  const ranks = new Map();
+  const n = sorted.length;
+  sorted.forEach(([id], i) => ranks.set(id, n > 1 ? i / (n - 1) : 0));
+  return ranks;
 }
 
 // Le n coppie {id, value} con valore più alto e più basso per la metrica data,
