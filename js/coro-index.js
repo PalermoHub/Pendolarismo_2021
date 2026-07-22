@@ -1,7 +1,9 @@
 // Metriche per comune derivate da flowIndex.totals ({out, in, self}) e dalla
 // popolazione residente 2021. Restituisce null per un comune quando la metrica
-// non è calcolabile (residenti=0 per autocontenimento; pop_res assente, es.
-// Sardegna, per intensità), mai 0: 0 e "nessun dato" hanno significati diversi.
+// non è calcolabile (residenti=0 per autocontenimento; pop_res assente per
+// intensità — oggi solo Sassofeltrio per disallineamento di codice ISTAT tra
+// dataset, v. PROCOM_REMAP in scripts/build_pop_res.py), mai 0: 0 e "nessun
+// dato" hanno significati diversi.
 export function computeMetrics(totals, popRes, areaKmq = null, distCapoluogo = null) {
   const result = new Map();
   for (const [id, t] of totals) {

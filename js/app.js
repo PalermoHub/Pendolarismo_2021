@@ -839,7 +839,7 @@ function renderScopeFlows(ids, minVal) {
     .map((id) => {
       const pos = point(id);
       const t = flowIndex.totals.get(id) ?? { out: 0, in: 0, self: 0 };
-      return pos ? { id, position: pos, radius: bubbleRadius(t.out + t.in + t.self), saldo: t.in - t.out } : null;
+      return pos ? { id, position: pos, radius: bubbleRadius(bubbleValue(id, "out")), saldo: t.in - t.out } : null;
     })
     .filter(Boolean);
   const scopeMaxAbsSaldo = Math.max(1, ...scopeNodes.map((d) => Math.abs(d.saldo)));
@@ -1059,7 +1059,7 @@ function renderAllFlows() {
   const nodeList = [...flowIndex.totals.entries()]
     .map(([id, t]) => {
       const pos = point(id);
-      return pos ? { id, position: pos, radius: bubbleRadius(t.out + t.in + t.self), saldo: t.in - t.out } : null;
+      return pos ? { id, position: pos, radius: bubbleRadius(bubbleValue(id, "out")), saldo: t.in - t.out } : null;
     })
     .filter(Boolean);
   const maxAbsSaldo = Math.max(1, ...nodeList.map((d) => Math.abs(d.saldo)));
@@ -1253,8 +1253,8 @@ map.on("load", () => {
   const modal = document.getElementById("infoModal");
   const tabBtn = document.getElementById("infoModalTab");
 
-  function open() { overlay.classList.add("open"); wrap.classList.add("open"); }
-  function close() { overlay.classList.remove("open"); wrap.classList.remove("open"); }
+  function open() { overlay.classList.add("open"); wrap.classList.add("open"); tabBtn.classList.add("open"); }
+  function close() { overlay.classList.remove("open"); wrap.classList.remove("open"); tabBtn.classList.remove("open"); }
   function toggle() { wrap.classList.contains("open") ? close() : open(); }
 
   tabBtn.addEventListener("click", toggle);
@@ -1324,7 +1324,7 @@ const METRIC_DEFS = {
   },
   intensita: {
     label: "Intensità pendolarismo",
-    unit: "% pop. residente che esce per lavoro (Sardegna: nessun dato)",
+    unit: "% pop. residente che esce per lavoro",
     description: "Quanto pendolarismo in uscita genera un comune rispetto alla sua popolazione: colori scuri = quota alta di residenti che si sposta fuori per lavoro.",
     colors: INTENSITA_COLORS,
     breaksKey: "intensitaBreaks",

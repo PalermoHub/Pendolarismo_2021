@@ -20,12 +20,12 @@ html, body { height: 100%; font-family: 'Titillium Web', system-ui, sans-serif; 
   box-shadow: -2px 0 8px rgba(0,0,0,.5);
   transition: right .3s var(--ease-pan);
 }
-.mobile-only, .mobile-only-sep { display: none; }
+.toolbarBtn.mobile-only, .mobile-only-sep { display: none; }
 @media (max-width: 768px) {
   #panel { width: min(350px, 88vw); }
   /* Su mobile la linguetta laterale è sostituita dal pulsante "Pannello" in toolbar. */
   #panelToggle { display: none; }
-  .mobile-only { display: flex; }
+  .toolbarBtn.mobile-only { display: flex; }
   .mobile-only-sep { display: block; }
 }
 #panelBody h2 { font-size: 15px; margin-bottom: 6px; color: #f0f0f0; }
@@ -404,15 +404,15 @@ html, body { height: 100%; font-family: 'Titillium Web', system-ui, sans-serif; 
 
 #infoModalWrap {
   position:fixed; top:0; left:50%;
-  transform:translateX(-50%) translateY(-100%);
+  transform:translate(-50%,-100%);
   width:80vw; z-index:1200;
   transition:transform .38s cubic-bezier(.4,0,.2,1);
   pointer-events:none;
 }
-#infoModalWrap.open { transform:translateX(-50%) translateY(0); pointer-events:auto; }
+#infoModalWrap.open { transform:translate(-50%,0); pointer-events:auto; }
 
 #infoModalTab {
-  position:absolute; bottom:-30px; left:50%; transform:translateX(-50%);
+  position:fixed; top:0; left:50%; transform:translateX(-50%);
   width:140px; height:30px;
   background:#0e0e13; border:1px solid rgba(255,255,255,.2); border-top:none;
   border-radius:0 0 8px 8px; cursor:pointer; color:#aaa;
@@ -420,11 +420,11 @@ html, body { height: 100%; font-family: 'Titillium Web', system-ui, sans-serif; 
   font-size:11.5px; font-weight:600; font-family:inherit;
   box-shadow:-2px 4px 12px rgba(0,0,0,.35);
   transition:background .15s, color .15s;
-  pointer-events:auto;
+  pointer-events:auto; z-index:1200;
 }
 #infoModalTab:hover { background:#1a1a22; color:#f0f0f0; }
 #infoTabArrow { transition:transform .35s cubic-bezier(.4,0,.2,1); }
-#infoModalWrap.open #infoTabArrow { transform:rotate(180deg); }
+#infoModalTab.open #infoTabArrow { transform:rotate(180deg); }
 
 #infoModal {
   width:100%; height:75vh;
@@ -499,6 +499,17 @@ html, body { height: 100%; font-family: 'Titillium Web', system-ui, sans-serif; 
 @media (max-width:768px) {
   #infoModalWrap { width:96vw; }
   .info-tab { font-size:11px; padding:10px 2px; }
+  #infoModalTab {
+    position: static; width: 46px; height: 44px;
+    border-top: 1px solid rgba(255,255,255,.12); border-left: none; border-right: none; border-bottom: none;
+    border-radius: 0; transform: none; box-shadow: none;
+    flex-direction: column; gap: 3px; background: none;
+    font-size: 8px; text-transform: uppercase; letter-spacing: .03em; color: #e8e8e8;
+  }
+  #infoModalTab:hover { background: rgba(255,255,255,.08); }
+  #infoModalTab.open { background: #ff9900; color: #111; }
+  #infoTabLabel { font-size: 7px; line-height: 1.15; text-align: center; }
+  #infoTabArrow { display: none; }
 }
 
 @media (max-width: 768px) {

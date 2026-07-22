@@ -87,6 +87,11 @@
     <svg viewBox="0 0 24 24"><path d="M4 5h16v2H4V5zm0 6h10v2H4v-2zm0 6h16v2H4v-2z"/></svg>
     <span>Pannello</span>
   </button>
+  <button id="infoModalTab" aria-label="Apri/chiudi informazioni" title="Informazioni">
+    <svg id="infoTabIcon" viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+    <span id="infoTabLabel">Informazioni</span>
+    <svg id="infoTabArrow" viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M7 10l5 5 5-5z"/></svg>
+  </button>
 </div>
 <div id="legend">
   <h3>Legenda <span id="legendHint">(clic per filtrare)</span></h3>
@@ -208,11 +213,6 @@
 <!-- ── Info modal (slide dal basso) ── -->
 <div id="infoOverlay"></div>
 <div id="infoModalWrap">
-  <button id="infoModalTab" aria-label="Apri/chiudi informazioni" title="Informazioni">
-    <svg id="infoTabIcon" viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-    <span id="infoTabLabel">Informazioni</span>
-    <svg id="infoTabArrow" viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M7 10l5 5 5-5z"/></svg>
-  </button>
   <div id="infoModal" role="dialog" aria-modal="true" aria-labelledby="infoModalTitle">
     <div class="gfm-header">
       <h3 id="infoModalTitle">
@@ -341,7 +341,7 @@
         <ul class="analisi-list">
           <li><strong>Autocontenimento lavorativo</strong> — percentuale di occupati residenti che lavorano nello stesso comune in cui abitano. Alto = comune "autosufficiente" dal punto di vista occupazionale.</li>
           <li><strong>Saldo pendolarismo</strong> — entrate meno uscite, stessa logica e stessi colori (blu = polo di lavoro, arancio = polo residenziale) del saldo netto già visto nelle card del pannello.</li>
-          <li><strong>Intensità pendolarismo</strong> — pendolari in uscita rispetto alla popolazione residente. I comuni della <strong>Sardegna</strong> sono mostrati in grigio ("nessun dato") perché la fonte usata per la popolazione residente non li copre.</li>
+          <li><strong>Intensità pendolarismo</strong> — pendolari in uscita rispetto alla popolazione residente. Qualche raro comune può comparire in grigio ("nessun dato") quando la fonte della popolazione residente non lo copre.</li>
         </ul>
         <p class="info-text">Ogni mappa usa 5 classi di colore a <strong>quantili</strong>: ogni classe raggruppa circa lo stesso numero di comuni, non lo stesso intervallo di valori — così anche indicatori con pochi valori estremi restano leggibili. Passa il mouse su un comune per vedere il suo valore, clicca per un popup con lo stesso dato.</p>
       </div>
