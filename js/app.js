@@ -1833,6 +1833,20 @@ function setActivePanelTab(tab) {
     clearCoroLayer();
     if (dataLoaded) updateFlowView();
   }
+  setMapRotationPitchLock(tab === "coro" || tab === "bivariate");
+}
+
+function setMapRotationPitchLock(locked) {
+  if (locked) {
+    map.dragRotate.disable();
+    map.touchZoomRotate.disableRotation();
+    map.keyboard.disableRotation();
+    if (map.getPitch() !== 0) map.easeTo({ pitch: 0, bearing: 0, duration: 300 });
+  } else {
+    map.dragRotate.enable();
+    map.touchZoomRotate.enableRotation();
+    map.keyboard.enableRotation();
+  }
 }
 
 document.getElementById("panelTabFlussi").addEventListener("click", () => setActivePanelTab("flussi"));

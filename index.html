@@ -28,7 +28,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,200;0,300;0,400;0,600;0,700;0,900;1,400&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/style.css?v=2" />
 
 
 	 <!-- Google tag (gtag.js) -->
@@ -344,6 +344,16 @@
           <li><strong>Intensità pendolarismo</strong> — pendolari in uscita rispetto alla popolazione residente. Qualche raro comune può comparire in grigio ("nessun dato") quando la fonte della popolazione residente non lo copre.</li>
         </ul>
         <p class="info-text">Ogni mappa usa 5 classi di colore a <strong>quantili</strong>: ogni classe raggruppa circa lo stesso numero di comuni, non lo stesso intervallo di valori — così anche indicatori con pochi valori estremi restano leggibili. Passa il mouse su un comune per vedere il suo valore, clicca per un popup con lo stesso dato.</p>
+
+        <hr class="analisi-sep">
+
+        <h3 class="analisi-h3">Tab "Bivariate"</h3>
+        <p class="info-text">Sempre nel pannello di destra trovi il tab <strong>Bivariate</strong>: invece di un solo indicatore, incrocia <strong>due indicatori insieme</strong> in un'unica mappa a griglia 3×3, per far emergere combinazioni che una mappa singola non mostra.</p>
+        <ul class="analisi-list">
+          <li><strong>Saldo × Densità popolazione</strong> — incrocia il saldo pendolari (entrate − uscite) con la densità abitativa. Angolo rosa: saldo negativo + densità alta = comuni "dormitorio densi" (satelliti di aree metropolitane). Angolo verde acqua: saldo positivo + densità bassa = "poli attrattori radi" (piccoli centri industriali/produttivi che polarizzano il lavoro di un territorio esteso).</li>
+          <li><strong>Autocontenimento × Distanza dal capoluogo</strong> — incrocia l'autocontenimento lavorativo con la distanza dal capoluogo di provincia: mostra l'effetto gravitazionale del capoluogo sui comuni limitrofi. Angolo grigio chiaro: vicini al capoluogo e poco autonomi (satelliti attratti). Angolo blu scuro: lontani e autonomi (poli locali indipendenti).</li>
+        </ul>
+        <p class="info-text">Ogni indicatore è diviso in 3 classi a <strong>tercili</strong> (basso/medio/alto: ognuna raggruppa circa un terzo dei comuni). Il colore di un comune combina la sua classe sull'asse X (indicatore 1) con quella sull'asse Y (indicatore 2): la <strong>legenda 3×3</strong> sopra la mappa mostra a colpo d'occhio le 9 combinazioni possibili ed è <strong>cliccabile</strong> — clicca una cella per isolare sulla mappa solo i comuni che rientrano in quella combinazione. Sotto la legenda trovi anche un <strong>donut</strong> con la distribuzione dei comuni nelle 9 classi e una <strong>classifica</strong> dei comuni più rappresentativi dei due angoli estremi della griglia. Passa il mouse su un comune per vedere entrambi i valori nel popup.</p>
       </div>
     </div>
 
