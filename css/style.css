@@ -22,7 +22,7 @@ html, body { height: 100%; font-family: 'Titillium Web', system-ui, sans-serif; 
 }
 .toolbarBtn.mobile-only, .mobile-only-sep { display: none; }
 @media (max-width: 768px) {
-  #panel { width: min(350px, 88vw); }
+  #panel { width: min(350px, 88vw); min-width: 0; }
   /* Su mobile la linguetta laterale è sostituita dal pulsante "Pannello" in toolbar. */
   #panelToggle { display: none; }
   .toolbarBtn.mobile-only { display: flex; }
