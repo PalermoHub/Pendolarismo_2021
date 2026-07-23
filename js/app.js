@@ -67,6 +67,7 @@ loadData().catch((err) => {
 
 const BASE_PADDING = 30;
 const panelEl = document.getElementById("panel");
+const toolbarEl = document.getElementById("mapToolbar");
 
 if (window.matchMedia("(max-width: 768px)").matches) {
   panelEl.classList.add("collapsed");
@@ -80,7 +81,16 @@ function computeMapPadding() {
   const offset = panelEl.classList.contains("collapsed")
     ? 0
     : panelEl.getBoundingClientRect().width;
-  return { top: BASE_PADDING, bottom: BASE_PADDING, left: BASE_PADDING, right: offset + BASE_PADDING };
+  // La toolbar è fissa sul bordo sinistro della mappa: senza compensarla nel
+  // padding, il centro "vero" (home view) risulta spostato a sinistra dietro
+  // di essa, più evidente su mobile dove occupa una fetta maggiore di schermo.
+  const toolbarWidth = toolbarEl ? toolbarEl.getBoundingClientRect().width : 0;
+  return {
+    top: BASE_PADDING,
+    bottom: BASE_PADDING,
+    left: toolbarWidth + BASE_PADDING,
+    right: offset + BASE_PADDING,
+  };
 }
 
 function setupPanelToggle() {
@@ -164,18 +174,18 @@ const map = new maplibregl.Map({
       },
     ],
   },
-  bounds: [
-    [5.6, 35.2],
-    [19.6, 47.2],
-  ],
-  fitBoundsOptions: { padding: computeMapPadding() },
-  minZoom: 5,
+  center: [12.41, 40.66],
+  zoom: 4.1,
+  minZoom: 1,
   maxZoom: 12,
-  hash: true,
+  // Box centrato sulla longitudine dell'Italia (12.41): quando il pan è
+  // vincolato ai bordi, MapLibre centra il box nel viewport, non il `center`
+  // sopra — un box sbilanciato a est spingeva l'Italia a sinistra.
   maxBounds: [
-    [4.5, 33.5],
-    [20.5, 48.5],
+    [-28, 10],
+    [52, 66],
   ],
+  hash: true,
   attributionControl: false,
 });
 
@@ -242,13 +252,10 @@ document.getElementById("btnComuneLinks").addEventListener("click", (e) => {
   if (selectedProCom !== null) renderArcs(selectedProCom);
 });
 
-const ITALY_BOUNDS = [
-  [5.6, 35.2],
-  [19.6, 47.2],
-];
+const HOME_VIEW = { center: [12.41, 40.66], zoom: 4.1 };
 
 document.getElementById("btnHome").addEventListener("click", () => {
-  map.fitBounds(ITALY_BOUNDS, { padding: computeMapPadding(), duration: 600 });
+  map.easeTo({ ...HOME_VIEW, padding: computeMapPadding(), duration: 600 });
 });
 
 const fsIconEnter = document.getElementById("fsIconEnter");
