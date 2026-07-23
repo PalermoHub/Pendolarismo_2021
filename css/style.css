@@ -496,7 +496,45 @@ html, body { height: 100%; font-family: 'Titillium Web', system-ui, sans-serif; 
 .analisi-table td.neg { color:#ff9900; font-weight:600; }
 #analisiRegioniChart .dest .pct { color:#bbb; }
 
+/* ── MODALE TABELLA FLUSSI COMUNE ─────────────────────────────────────── */
+#flowsTableOverlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:1100; }
+#flowsTableOverlay.open { display:block; }
+
+#flowsTableWrap {
+  display:none; position:fixed; top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  width:520px; max-width:92vw; z-index:1200;
+}
+#flowsTableWrap.open { display:block; }
+
+#flowsTableModal {
+  width:100%; max-height:80vh;
+  background:#0e0e13; border:1px solid rgba(255,255,255,.2);
+  border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,.6);
+  overflow:hidden; font-family:inherit;
+  display:flex; flex-direction:column;
+}
+#flowsTableClose { background:none; border:none; cursor:pointer; color:#999; font-size:14px; padding:4px; }
+#flowsTableClose:hover { color:#f0f0f0; }
+#flowsTableBody { overflow-y:auto; }
+
+.flows-export-bar { display:flex; gap:8px; padding:12px 16px 0; }
+.flows-export-btn {
+  flex:1; padding:8px; border:1px solid rgba(255,255,255,.2); border-radius:6px;
+  background:none; color:#e8e8e8; font-size:12px; cursor:pointer; font-family:inherit;
+}
+.flows-export-btn:hover { border-color:#ff9900; color:#ff9900; }
+.flows-self-row td {
+  background:rgba(255,153,0,.18);
+  font-style:italic;
+  font-weight:700;
+  color:#ffb84d;
+  border-bottom:2px solid #ff9900;
+}
+.flows-self-row td:first-child { border-left:3px solid #ff9900; }
+
 @media (max-width:768px) {
+  #flowsTableWrap { width:94vw; }
   #infoModalWrap { width:96vw; }
   .info-tab { font-size:11px; padding:10px 2px; }
   #infoModalTab {

@@ -18,17 +18,16 @@
   integrity="sha384-4sbA4B4Oqxkzs6apu8HaZcGrL3BySmt0tO/LQf6al3hkgq8ijZFxkTkvxxZZ/3PU" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/deck.gl@9.0.35/dist.min.js"
   integrity="sha384-Vr15y1r5cZ83amAjUB8zTA39xVjYBmxu/q5yF+gyhKdcf73hnNmOA1FkvIZGqLmX" crossorigin="anonymous"></script>
-      <meta name="keywords" content="Open Data, Sicilia, PAI, Geologia, istat, pendolarismmo, Palermo">
-    <meta name="author" content="Giovan Battista Vitrano per OpenDataSicilia.it">
-    <meta http-equiv="content-language" content="IT">
-    <meta name="robots" content="index,follow">
+      <meta name="keywords" content="Open Data, Sicilia, PAI, Geologia, istat,
+      
+      
     <meta name="creation_Date" content="22/07/2026">
     <link rel="shortcut icon" href="img/favicon.ico"/>
     <link rel="icon" href="img/favicon.png" type="image/png"/>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,200;0,300;0,400;0,600;0,700;0,900;1,400&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="css/style.css?v=3" />
+<link rel="stylesheet" href="css/style.css?v=5" />
 
 
 	 <!-- Google tag (gtag.js) -->
@@ -81,6 +80,10 @@
   <button id="btnComuneLinks" class="toolbarBtn toggleBtn" title="Mostra tutti i collegamenti del comune selezionato">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="6" r="2"/><circle cx="4" cy="18" r="2"/><circle cx="20" cy="18" r="2"/><path d="M12 12L4 6M12 12L20 6M12 12L4 18M12 12L20 18" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>
     <span>Comune</span>
+  </button>
+  <button id="btnFlowsTable" class="toolbarBtn" title="Tabella flussi del comune selezionato">
+    <svg viewBox="0 0 24 24"><path d="M4 4h16v4H4V4zm0 6h7v10H4V10zm9 0h7v10h-7V10z"/></svg>
+    <span>Tabella</span>
   </button>
   <div class="toolbarSep mobile-only-sep"></div>
   <button id="btnPanelToggleMobile" class="toolbarBtn toggleBtn mobile-only" title="Apri/chiudi pannello">
@@ -303,6 +306,8 @@
           <li><span class="guida-icon"><svg viewBox="0 0 24 24"><path d="M20 5.41L18.59 4 7 15.59V9H5v10h10v-2H8.41z"/></svg></span> <strong>Entrata</strong> — mostra solo chi entra nel comune</li>
           <li><span class="guida-icon"><svg viewBox="0 0 24 24"><path d="M9.01 14H2v2h7.01v3L13 15l-3.99-4v3zm5.98-1v-3H22V8h-7.01V5L11 9l3.99 4z"/></svg></span> <strong>Entrambi</strong> — mostra insieme i flussi in entrata e in uscita</li>
           <li><span class="guida-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="6" r="2"/><circle cx="4" cy="18" r="2"/><circle cx="20" cy="18" r="2"/><path d="M12 12L4 6M12 12L20 6M12 12L4 18M12 12L20 18" stroke="currentColor" stroke-width="1.3" fill="none"/></svg></span> <strong>Mostra tutti i collegamenti del comune</strong> — attivo quando selezioni un comune specifico: mostra <em>tutti</em> i suoi collegamenti, anche verso comuni fuori dalla regione/provincia scelta</li>
+          <li><span class="guida-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v4H4V4zm0 6h7v10H4V10zm9 0h7v10h-7V10z"/></svg></span> <strong>Tabella</strong> — apre la tabella con i dati del comune selezionato ed i pulsanti per scaricarli in CSV o JSON</li>
+
         </ul>
 
         <h3 class="analisi-h3">Come si usa in pratica</h3>
@@ -311,6 +316,18 @@
           <li>Clicca su un punto/comune sulla mappa (il sito stesso te lo suggerisce con la scritta "Clicca un comune sulla mappa")</li>
           <li>Il comune diventa "selezionato" (colore dedicato in legenda) e la mappa mostra solo i suoi collegamenti in entrata/uscita</li>
           <li>Da lì puoi affinare ulteriormente con le opzioni Entrata/Uscita/Entrambi, o allargare la vista con "Mostra tutti i collegamenti del comune"</li>
+        </ol>
+
+        <hr class="analisi-sep">
+
+        <h3 class="analisi-h3">Scaricare i dati di un comune</h3>
+        <p class="info-text">Vuoi portarti via i numeri di un comune, ad esempio per un'analisi in Excel o in un altro software? Basta selezionarlo e usare la tabella dedicata:</p>
+        <ol class="analisi-list">
+          <li>Clicca un comune sulla mappa per selezionarlo</li>
+          <li>Apri lo strumento <strong>Tabella</strong> nella barra a sinistra (icona con due rettangoli)</li>
+          <li>Si apre una finestra con l'elenco di tutti i comuni collegati: per ognuno vedi <strong>codice ISTAT</strong>, <strong>Entrata</strong>, <strong>Uscita</strong> e <strong>Saldo</strong>; la prima riga evidenziata mostra invece chi vive e lavora nello stesso comune</li>
+          <li>In alto trovi due pulsanti, <strong>Scarica CSV</strong> e <strong>Scarica JSON</strong>: cliccandoli scarichi l'intera tabella nel formato scelto, pronta per essere aperta in un foglio di calcolo o importata in altri strumenti</li>
+          <li>Se cambi comune sulla mappa mentre la finestra è aperta, la tabella si aggiorna automaticamente con i dati del nuovo comune</li>
         </ol>
 
         <hr class="analisi-sep">
@@ -385,6 +402,23 @@
     <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M7 14l5-5 5 5z"/></svg>
   </button>
 </div><!-- /infoModalWrap -->
+
+<!-- ── Modale tabella flussi comune ── -->
+<div id="flowsTableOverlay"></div>
+<div id="flowsTableWrap">
+  <div id="flowsTableModal" role="dialog" aria-modal="true" aria-labelledby="flowsTableTitle">
+    <div class="gfm-header">
+      <h3 id="flowsTableTitle">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M4 4h16v4H4V4zm0 6h7v10H4V10zm9 0h7v10h-7V10z"/></svg>
+        <span id="flowsTableTitleText">Tabella flussi</span>
+      </h3>
+      <button id="flowsTableClose" aria-label="Chiudi">&#x2715;</button>
+    </div>
+    <div class="info-panel active" id="flowsTableBody">
+      <p class="hint">Seleziona un comune sulla mappa.</p>
+    </div>
+  </div>
+</div><!-- /flowsTableWrap -->
 
 <script type="module" src="js/app.js"></script>
 

@@ -1180,6 +1180,124 @@ function renderPanel(proCom, comuneName) {
   `;
 }
 
+// Righe entrata/uscita/saldo per ogni comune collegato al comune selezionato,
+// unendo byOrigin (uscita) e byDest (entrata) per lo stesso "other".
+function comuneFlowsRows(proCom) {
+  const rows = new Map(); // other -> { entrata, uscita }
+  const ensure = (id) => {
+    if (!rows.has(id)) rows.set(id, { entrata: 0, uscita: 0 });
+    return rows.get(id);
+  };
+  for (const { other, val } of flowIndex.byOrigin.get(proCom) ?? []) ensure(other).uscita += val;
+  for (const { other, val } of flowIndex.byDest.get(proCom) ?? []) ensure(other).entrata += val;
+
+  const collegati = [...rows.entries()]
+    .map(([id, v]) => ({ id, nome: nomeComune(id), entrata: v.entrata, uscita: v.uscita, saldo: v.entrata - v.uscita, self: false }))
+    .sort((a, b) => b.saldo - a.saldo);
+
+  const self = flowIndex.totals.get(proCom)?.self ?? 0;
+  const selfRow = { id: proCom, nome: nomeComune(proCom), entrata: self, uscita: self, saldo: 0, self: true };
+  return [selfRow, ...collegati];
+}
+
+// Codice ISTAT comune a 6 cifre (pro_com con zero-padding a sinistra).
+function istatCode(id) {
+  return String(id).padStart(6, "0");
+}
+
+let flowsTableData = null; // { comuneName, rows } correnti, per l'export
+
+function renderFlowsTable(proCom, comuneName) {
+  const bodyEl = document.getElementById("flowsTableBody");
+  const titleEl = document.getElementById("flowsTableTitleText");
+  if (!bodyEl) return;
+
+  if (proCom == null) {
+    flowsTableData = null;
+    titleEl.textContent = "Tabella flussi";
+    bodyEl.innerHTML = `<p class="hint" style="padding:14px 16px">Seleziona un comune sulla mappa.</p>`;
+    return;
+  }
+
+  const rows = comuneFlowsRows(proCom);
+  flowsTableData = { comuneName, rows };
+  titleEl.textContent = `Tabella flussi — ${comuneName}`;
+
+  const body = rows
+    .map((r) => {
+      const cls = r.saldo >= 0 ? "pos" : "neg";
+      const label = r.self ? `${esc(r.nome)} <span class="hint">(vive e lavora qui)</span>` : esc(r.nome);
+      return `<tr${r.self ? ' class="flows-self-row"' : ""}>
+        <td>${label}</td>
+        <td>${istatCode(r.id)}</td>
+        <td>${fmt(r.entrata)}</td>
+        <td>${fmt(r.uscita)}</td>
+        <td class="${cls}">${r.saldo >= 0 ? "+" : ""}${fmt(r.saldo)}</td>
+      </tr>`;
+    })
+    .join("");
+
+  bodyEl.innerHTML = `
+    <div class="flows-export-bar">
+      <button id="flowsExportCsv" class="flows-export-btn">Scarica CSV</button>
+      <button id="flowsExportJson" class="flows-export-btn">Scarica JSON</button>
+    </div>
+    <div class="info-section">
+      <p class="info-text">${rows.length - 1} comuni collegati a <strong>${esc(comuneName)}</strong>, più la quota di chi vive e lavora nello stesso comune. Entrata = pendolari che arrivano da quel comune, Uscita = pendolari che vi si recano, Saldo = entrata − uscita.</p>
+      <div class="analisi-table-wrap">
+        <table class="analisi-table">
+          <thead><tr><th>Comune</th><th>Cod. ISTAT</th><th>Entrata</th><th>Uscita</th><th>Saldo</th></tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("flowsExportCsv").addEventListener("click", () => exportFlowsTable("csv"));
+  document.getElementById("flowsExportJson").addEventListener("click", () => exportFlowsTable("json"));
+}
+
+function downloadBlob(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function csvField(v) {
+  const s = String(v);
+  return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function exportFlowsTable(kind) {
+  if (!flowsTableData) return;
+  const { comuneName, rows } = flowsTableData;
+  const safeName = comuneName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+  if (kind === "csv") {
+    const header = ["comune", "cod_istat", "entrata", "uscita", "saldo", "stesso_comune"].join(";");
+    const lines = rows.map((r) =>
+      [csvField(r.nome), istatCode(r.id), r.entrata, r.uscita, r.saldo, r.self ? "1" : "0"].join(";")
+    );
+    downloadBlob(`flussi-${safeName}.csv`, [header, ...lines].join("\n"), "text/csv;charset=utf-8");
+  } else {
+    const data = rows.map((r) => ({
+      comune: r.nome,
+      cod_istat: istatCode(r.id),
+      entrata: r.entrata,
+      uscita: r.uscita,
+      saldo: r.saldo,
+      stesso_comune: r.self,
+    }));
+    downloadBlob(`flussi-${safeName}.json`, JSON.stringify({ comune: comuneName, flussi: data }, null, 2), "application/json");
+  }
+}
+
 let popup = null;
 
 function showPopup(lngLat, html) {
@@ -1196,6 +1314,9 @@ function onComuneClick(proCom, comuneName, lngLat) {
   renderArcs(proCom);
   renderPanel(proCom, comuneName);
   syncFiltersToComune(proCom);
+  if (document.getElementById("flowsTableWrap").classList.contains("open")) {
+    renderFlowsTable(proCom, comuneName);
+  }
 
   const totals = flowIndex.totals.get(proCom) ?? { out: 0, in: 0, self: 0 };
   const saldo = totals.in - totals.out;
@@ -1292,6 +1413,26 @@ map.on("load", () => {
       updateTotop();
     });
   });
+})();
+
+// ── Modale tabella flussi comune ───────────────────────────────────────
+(function initFlowsTableModal() {
+  const overlay = document.getElementById("flowsTableOverlay");
+  const wrap = document.getElementById("flowsTableWrap");
+  const tabBtn = document.getElementById("btnFlowsTable");
+
+  function open() {
+    overlay.classList.add("open");
+    wrap.classList.add("open");
+    renderFlowsTable(selectedProCom, selectedProCom != null ? nomeComune(selectedProCom) : null);
+  }
+  function close() { overlay.classList.remove("open"); wrap.classList.remove("open"); }
+  function toggle() { wrap.classList.contains("open") ? close() : open(); }
+
+  tabBtn.addEventListener("click", toggle);
+  overlay.addEventListener("click", close);
+  document.getElementById("flowsTableClose").addEventListener("click", close);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
 })();
 
 // ── Tab Coroplettiche ────────────────────────────────────────────────────
