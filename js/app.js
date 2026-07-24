@@ -1220,7 +1220,7 @@ function renderFlowsTable(proCom, comuneName) {
   }
 
   const rows = comuneFlowsRows(proCom);
-  flowsTableData = { comuneName, rows };
+  flowsTableData = { proCom, comuneName, rows };
   titleEl.textContent = `Tabella flussi — ${comuneName}`;
 
   const body = rows
@@ -1241,6 +1241,7 @@ function renderFlowsTable(proCom, comuneName) {
     <div class="flows-export-bar">
       <button id="flowsExportCsv" class="flows-export-btn">Scarica CSV</button>
       <button id="flowsExportJson" class="flows-export-btn">Scarica JSON</button>
+      <button id="flowsExportGeojson" class="flows-export-btn">Scarica GeoJSON</button>
     </div>
     <div class="info-section">
       <p class="info-text">${rows.length - 1} comuni collegati a <strong>${esc(comuneName)}</strong>, più la quota di chi vive e lavora nello stesso comune. Entrata = pendolari che arrivano da quel comune, Uscita = pendolari che vi si recano, Saldo = entrata − uscita.</p>
@@ -1255,6 +1256,7 @@ function renderFlowsTable(proCom, comuneName) {
 
   document.getElementById("flowsExportCsv").addEventListener("click", () => exportFlowsTable("csv"));
   document.getElementById("flowsExportJson").addEventListener("click", () => exportFlowsTable("json"));
+  document.getElementById("flowsExportGeojson").addEventListener("click", () => exportFlowsTable("geojson"));
 }
 
 function downloadBlob(filename, content, mime) {
@@ -1276,8 +1278,44 @@ function csvField(v) {
 
 function exportFlowsTable(kind) {
   if (!flowsTableData) return;
-  const { comuneName, rows } = flowsTableData;
+  const { proCom, comuneName, rows } = flowsTableData;
   const safeName = comuneName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+  if (kind === "geojson") {
+    const origin = point(proCom);
+    const features = rows.map((r) => {
+      if (r.self) {
+        return {
+          type: "Feature",
+          geometry: origin ? { type: "Point", coordinates: origin } : null,
+          properties: {
+            comune: r.nome,
+            cod_istat: istatCode(r.id),
+            entrata: r.entrata,
+            uscita: r.uscita,
+            saldo: r.saldo,
+            stesso_comune: true,
+          },
+        };
+      }
+      const dest = point(r.id);
+      return {
+        type: "Feature",
+        geometry: origin && dest ? { type: "LineString", coordinates: [origin, dest] } : null,
+        properties: {
+          comune: r.nome,
+          cod_istat: istatCode(r.id),
+          entrata: r.entrata,
+          uscita: r.uscita,
+          saldo: r.saldo,
+          stesso_comune: false,
+        },
+      };
+    });
+    const geojson = { type: "FeatureCollection", features };
+    downloadBlob(`flussi-${safeName}.geojson`, JSON.stringify(geojson, null, 2), "application/geo+json");
+    return;
+  }
 
   if (kind === "csv") {
     const header = ["comune", "cod_istat", "entrata", "uscita", "saldo", "stesso_comune"].join(";");
