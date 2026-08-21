@@ -10,6 +10,19 @@ let mapLoaded = false;
 let popRes = null;
 let coroData = null; // { metrics: Map<id,{autocontenimento,saldo,intensita,densita,distanzaCapoluogo}>, ...Breaks (5 classi), ...Breaks3 (tercili), ...Ranks (percentile) }
 
+// Se incorporata in iframe su palermohub.opendatasicilia.it, tiene sincronizzata
+// la barra indirizzi del parent (#zoom/lat/lng) via postMessage.
+(function () {
+  const PARENT_ORIGIN = "https://palermohub.opendatasicilia.it";
+  function notifyParentRoute() {
+    if (window.parent === window) return;
+    try {
+      window.parent.postMessage({ type: "hash:route", hash: window.location.hash }, PARENT_ORIGIN);
+    } catch (e) { /* iframe non raggiungibile, ignora */ }
+  }
+  window.addEventListener("hashchange", notifyParentRoute);
+})();
+
 function fetchJson(path) {
   return fetch(path).then((r) => {
     if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
