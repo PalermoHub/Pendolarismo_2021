@@ -10,19 +10,6 @@ let mapLoaded = false;
 let popRes = null;
 let coroData = null; // { metrics: Map<id,{autocontenimento,saldo,intensita,densita,distanzaCapoluogo}>, ...Breaks (5 classi), ...Breaks3 (tercili), ...Ranks (percentile) }
 
-// Se incorporata in iframe su palermohub.opendatasicilia.it, tiene sincronizzata
-// la barra indirizzi del parent (#zoom/lat/lng) via postMessage.
-(function () {
-  const PARENT_ORIGIN = "https://palermohub.opendatasicilia.it";
-  function notifyParentRoute() {
-    if (window.parent === window) return;
-    try {
-      window.parent.postMessage({ type: "hash:route", hash: window.location.hash }, PARENT_ORIGIN);
-    } catch (e) { /* iframe non raggiungibile, ignora */ }
-  }
-  window.addEventListener("hashchange", notifyParentRoute);
-})();
-
 function fetchJson(path) {
   return fetch(path).then((r) => {
     if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
@@ -147,46 +134,7 @@ const PMTILES_URL = "https://gbvitrano.it/anncus/data/comuni.pmtiles";
 
 const map = new maplibregl.Map({
   container: "map",
-  style: {
-    version: 8,
-    sources: {
-      "carto-dark": {
-        type: "raster",
-        tiles: [
-          "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-          "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-          "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-          "https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-        ],
-        tileSize: 256,
-        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-      },
-      comuni: {
-        type: "vector",
-        url: `pmtiles://${PMTILES_URL}`,
-        promoteId: { comuni: "pro_com" },
-      },
-    },
-    layers: [
-      { id: "background", type: "background", paint: { "background-color": "#0a0a0f" } },
-      { id: "carto-dark-layer", type: "raster", source: "carto-dark" },
-      {
-        id: "comuni-fill",
-        type: "fill",
-        source: "comuni",
-        "source-layer": "comuni",
-        paint: { "fill-color": "#000000", "fill-opacity": 0 },
-      },
-      {
-        id: "comuni-selected",
-        type: "line",
-        source: "comuni",
-        "source-layer": "comuni",
-        paint: { "line-color": "#3d7fff", "line-width": 2.5 },
-        filter: ["==", ["get", "pro_com"], -1],
-      },
-    ],
-  },
+  style: "https://tiles.openfreemap.org/styles/dark",
   center: [12.41, 40.66],
   zoom: 4.1,
   minZoom: 1,
@@ -1387,6 +1335,27 @@ hoverTooltip.style.display = "none";
 document.getElementById("map").appendChild(hoverTooltip);
 
 map.on("load", () => {
+  map.addSource("comuni", {
+    type: "vector",
+    url: `pmtiles://${PMTILES_URL}`,
+    promoteId: { comuni: "pro_com" },
+  });
+  map.addLayer({
+    id: "comuni-fill",
+    type: "fill",
+    source: "comuni",
+    "source-layer": "comuni",
+    paint: { "fill-color": "#000000", "fill-opacity": 0 },
+  });
+  map.addLayer({
+    id: "comuni-selected",
+    type: "line",
+    source: "comuni",
+    "source-layer": "comuni",
+    paint: { "line-color": "#3d7fff", "line-width": 2.5 },
+    filter: ["==", ["get", "pro_com"], -1],
+  });
+
   map.on("mousemove", "comuni-fill", (e) => {
     map.getCanvas().style.cursor = "pointer";
     const f = e.features[0];
